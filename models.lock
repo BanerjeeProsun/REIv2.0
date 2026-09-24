@@ -1,0 +1,14 @@
+[
+    {
+        "name": "llama-3-8b-instruct.Q4_K_M.gguf",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "url": "https://huggingface.co/...",
+        "license": "llama3"
+    },
+    {
+        "name": "silero_vad.onnx",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "url": "https://github.com/snakers4/silero-vad/...",
+        "license": "MIT"
+    }
+]
