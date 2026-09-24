@@ -1,6 +1,4 @@
-import pytest
-from pydantic import ValidationError
-from rei.policy.config import load_policy_config, PolicyConfig
+from rei.policy.config import load_policy_config
 
 def test_load_policy_config() -> None:
     config = load_policy_config("src/rei/policy/policy.toml")

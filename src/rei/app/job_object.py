@@ -1,6 +1,6 @@
-import win32api  # type: ignore
-import win32con  # type: ignore
-import win32job  # type: ignore
+import win32api 
+import win32con 
+import win32job 
 import subprocess
 
 

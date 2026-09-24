@@ -1,6 +1,6 @@
 import tomllib
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Dict, List, Any
+from typing import Dict, List
 
 class DefaultsConfig(BaseModel):
     model_config = ConfigDict(strict=True)

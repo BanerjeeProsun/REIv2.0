@@ -20,7 +20,7 @@ def test_intent_proposal_strictness() -> None:
         IntentProposal(
             type="intent",
             capability="media.set_volume",
-            capability_version="3",  # type: ignore
+            capability_version="3", 
             args={"level": 40},
             rationale="User asked to turn it down a bit",
         )
