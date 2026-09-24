@@ -33,4 +33,4 @@ def test_capability_arguments_strictness() -> None:
 
     # Must fail because of extra argument
     with pytest.raises(ValidationError):
-        SetVolumeArgs(level=50, extra_arg="sneaky") 
+        SetVolumeArgs(level=50, extra_arg="sneaky") # type: ignore

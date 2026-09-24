@@ -2,7 +2,10 @@ import pytest
 from rei.egress.gate import EgressGate, EgressRequest, EgressPayloadPart, EgressBlockedError
 from rei.capabilities.spec import DataClass
 from rei.policy.schemas import PrivacyMode
-from rei.policy.config import PolicyConfig, DefaultsConfig, PreauthoriseConfig, DisabledConfig, UrlPolicyConfig, EgressHostConfig
+from rei.policy.config import (
+    PolicyConfig, DefaultsConfig, PreauthoriseConfig, 
+    DisabledConfig, UrlPolicyConfig, EgressHostConfig
+)
 
 @pytest.fixture
 def policy_config() -> PolicyConfig:

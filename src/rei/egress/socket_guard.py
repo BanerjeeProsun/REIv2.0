@@ -39,4 +39,4 @@ class GuardedSocket(_original_socket):
         return super().connect_ex(address)
 
 def install_socket_guard() -> None:
-    socket.socket = GuardedSocket
+    socket.socket = GuardedSocket # type: ignore

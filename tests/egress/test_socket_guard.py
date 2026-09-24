@@ -21,4 +21,4 @@ def test_socket_guard() -> None:
             s.connect(("8.8.8.8", 53))
             
     finally:
-        socket.socket = orig_socket
+        socket.socket = orig_socket # type: ignore

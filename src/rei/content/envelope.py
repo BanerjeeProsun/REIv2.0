@@ -16,4 +16,5 @@ class ContentEnvelope:
     
     def format_for_model(self) -> str:
         # Enclose the content in a strict structural envelope so prompt injection is contained
-        return f"\n<UNTRUSTED_CONTENT source=\"{self.source_id}\" type=\"{self.taint.value}\">\n{self.sanitized_content}\n</UNTRUSTED_CONTENT>\n"
+        header = f'<UNTRUSTED_CONTENT source="{self.source_id}" type="{self.taint.value}">'
+        return f"\n{header}\n{self.sanitized_content}\n</UNTRUSTED_CONTENT>\n"
