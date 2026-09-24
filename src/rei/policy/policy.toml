@@ -1,0 +1,28 @@
+# src/rei/policy/policy.toml
+version = "2026.09.1"
+
+[defaults]
+confirm_timeout_s = 30
+voice_confirm_window_s = 10
+max_intents_per_turn = 3
+
+[rate_limits]
+"web.open_url" = "10/min"
+"files.download" = "3/hour"
+"email.send" = "5/hour"
+
+[preauthorise]
+allowed = ["web.lookup", "email.list_subjects"]
+
+[disabled]
+capabilities = []
+
+[url_policy]
+schemes = ["https"]
+blocked_tlds = ["zip", "mov"]
+blocked_hosts_file = "blocklist.txt"
+max_length = 2048
+
+[egress.hosts]
+"integrate.api.nvidia.com" = { modes = ["cloud_assisted"], purpose = "planner" }
+"api.open-meteo.com" = { modes = ["local_plus_web", "cloud_assisted"], purpose = "weather", max_class = "C0" }

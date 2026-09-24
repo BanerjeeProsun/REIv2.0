@@ -1,0 +1,56 @@
+[importlinter]
+root_package = rei
+include_external_packages = True
+unmatched_ignore_imports_alerts = False
+
+
+[importlinter:contract:network-only-in-egress]
+name = Network only in egress
+type = forbidden
+source_modules =
+    rei
+forbidden_modules =
+    httpx
+    requests
+    urllib3
+    aiohttp
+
+[importlinter:contract:no-subprocess]
+name = No subprocess
+type = forbidden
+source_modules =
+    rei
+forbidden_modules =
+    subprocess
+ignore_imports =
+    rei.app.job_object -> subprocess
+    rei.app.supervisor -> subprocess
+
+
+[importlinter:contract:policy-is-pure]
+name = Policy is pure
+type = forbidden
+source_modules =
+    rei.policy
+forbidden_modules =
+    rei.models
+    rei.egress
+    rei.host
+    subprocess
+    socket
+
+[importlinter:contract:capabilities-no-models]
+name = Capabilities cannot use models
+type = forbidden
+source_modules =
+    rei.capabilities
+forbidden_modules =
+    rei.models
+
+[importlinter:contract:core-no-side-effects]
+name = Core does not perform side effects
+type = forbidden
+source_modules =
+    rei.core
+forbidden_modules =
+    rei.capabilities.builtin

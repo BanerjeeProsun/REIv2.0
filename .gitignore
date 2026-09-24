@@ -1,0 +1,28 @@
+# Environment
+.venv/
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE
+.vscode/
+.idea/
+
+# UV / Hatch
+uv.lock
+build/
+dist/
+*.egg-info/
+
+# Tests
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+
+# Project specific
+logs/
+audit/
+rei.db
