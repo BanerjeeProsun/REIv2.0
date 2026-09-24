@@ -1,7 +1,7 @@
 # Rei
 Local-first AI operating layer for Windows.
 
-Rei is an AI assistant architecture rebuilt from the ground up to ensure strict security, user privacy, and high performance. It adheres strictly to the principle that model output is an intent, never an action. 
+Rei is an AI assistant architecture rebuilt from the ground up to ensure strict security, user privacy, and high performance. It adheres strictly to the principle that model output is an intent, never an action.
 
 ## Core Principles
 
@@ -22,6 +22,26 @@ The repository is organized into five strict trust zones:
 * Rei Core: Pipeline orchestration, policy evaluation, and capability intent parsing.
 * Capability Host: The isolated execution environment processing typed capability side effects.
 * Egress Broker: The single, restricted network client.
+
+## Development Progress
+
+### Completed Milestones
+The foundational architecture and core security boundaries have been established:
+* Canonical Runtime and Pipeline: A strict 8-stage execution pipeline is in place.
+* Process Supervisor: Job Object backed process supervision with crash loop protection and graceful shutdown handles.
+* Capability Registry: Legacy shell execution has been completely replaced by a typed capability registry (e.g., apps.open, media.set_volume, web.open_url) using strict Pydantic schemas.
+* Policy Engine: A pure, deterministic policy engine evaluates intents based on integrity, kill switches, origin, taint, and data classification.
+* Grant Verification: Cryptographically verified GrantTokens enforce that execution only occurs with explicit engine approval.
+* Development Tooling: Strict mypy typing, ruff linting, and importlinter zone boundaries are fully configured and passing in CI.
+
+### Coming Soon
+* Privacy Modes and Egress Gate: Implementation of the socket guard and egress broker to enforce local_only zero-egress guarantees.
+* Content Guard and Taint Propagation: Sandboxing untrusted inputs (email, web, clipboard) inside envelopes and propagating taint across the execution pipeline.
+* Confirmation Broker: Interactive UI cards for risk-tier capabilities requiring explicit user approval.
+* Interim API Hardening: Per-launch token authentication and origin validation for local API endpoints.
+* Phase P1 (Consolidation): Named-pipe IPC, encrypted SQLite memory storage, and hash-pinned dependency management.
+* Phase P2 (Engineering Quality): Quarantined reader mode for untrusted content and constrained decoding for models.
+* Phase P3 (Advanced Hardening): Separated host processes, Windows Firewall rules, and Authenticode signing.
 
 ## Development
 
