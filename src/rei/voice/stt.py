@@ -62,7 +62,7 @@ class SpeechToText:
             
             # Filter common Whisper hallucinations
             clean_text = text.strip()
-            hallucinations = ["Thank you.", "I didn't quite catch that.", "Bye.", "Thanks for watching!", "Amara.org", "You", "Thank you"]
+            hallucinations = ["Thank you.", "I didn't quite catch that.", "Bye.", "Thanks for watching!", "Amara.org", "You", "Thank you", ".", ". . . ."]
             if clean_text in hallucinations:
                 return ""
             

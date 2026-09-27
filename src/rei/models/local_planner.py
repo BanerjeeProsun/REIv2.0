@@ -38,16 +38,16 @@ class LocalPlanner(ModelAdapter):
         def _generate_sync() -> str:
             # Llama 3.2 Instruct format
             formatted_prompt = (
-                f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n"
+                f"<|start_header_id|>system<|end_header_id|>\n\n"
                 f"{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
             )
             
             output = self.model(
                 formatted_prompt,
-                max_tokens=256,
+                max_tokens=512,
                 stop=["<|eot_id|>"],
-                echo=False,
-                temperature=0.0
+                temperature=0.0,
+                response_format={"type": "json_object"}
             )
             return output["choices"][0]["text"].strip() # type: ignore
             
