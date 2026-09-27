@@ -54,19 +54,35 @@ def create_orchestrator() -> Orchestrator:
 
     policy_engine = PolicyEngine(registry, policy_config, grant_key)
     
-    # Phase P4: Fully Local Intelligence
+    # Phase P4: Multi-Model Intelligence
+    from rei.models.nim_planner import CloudAssistedPlanner
     from rei.models.local_planner import LocalPlanner
-    model: ModelAdapter
+    
+    # We load both models as per MOD-03 (Local planner for local_only) and PRV-01.
+    # The Cloud Planner is used for CLOUD_ASSISTED mode.
+    try:
+        cloud_model = CloudAssistedPlanner("meta/llama-3.2-11b-vision-instruct")
+    except Exception as e:
+        print(f"Failed to load NIM Planner: {e}")
+        cloud_model = None
+
     model_path = Path("models/Llama-3.2-1B-Instruct-Q4_K_M.gguf")
     try:
-        model = LocalPlanner(model_path, n_ctx=4096)
+        local_model = LocalPlanner(model_path, n_ctx=4096)
     except Exception as e:
-        print(f"Failed to load Local Planner: {e}. Falling back to FakeModel.")
+        print(f"Failed to load Local Planner: {e}")
+        local_model = None
+
+    # For now, since the VoiceLoop context hardcodes CLOUD_ASSISTED, we use cloud_model.
+    # In a full implementation, Orchestrator would hold a ModelManager that dynamically routes.
+    active_model = cloud_model if cloud_model else local_model
+    if not active_model:
+        print("Falling back to FakeModel.")
         from rei.models.fake import FakeModel
-        model = FakeModel()
+        active_model = FakeModel()
 
     return Orchestrator(
-        model=model,
+        model=active_model,
         registry=registry,
         policy_engine=policy_engine,
         parser=IntentParser(),
