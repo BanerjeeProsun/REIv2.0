@@ -25,8 +25,7 @@ class VoiceActivityDetector:
         
     def reset(self) -> None:
         """Reset the internal RNN state."""
-        self._h = np.zeros((2, 1, 64), dtype=np.float32)
-        self._c = np.zeros((2, 1, 64), dtype=np.float32)
+        self._state = np.zeros((2, 1, 128), dtype=np.float32)
 
     def process_chunk(self, audio_chunk: np.ndarray) -> bool:
         """Process a chunk of audio and return True if speech is detected.
@@ -39,12 +38,16 @@ class VoiceActivityDetector:
         ort_inputs = {
             'input': input_data,
             'sr': np.array(self.sample_rate, dtype=np.int64),
-            'h': self._h,
-            'c': self._c
+            'state': self._state
         }
         
-        ort_outs = self.session.run(None, ort_inputs)
-        out, self._h, self._c = ort_outs
+        try:
+            ort_outs = self.session.run(None, ort_inputs)
+            out, self._state = ort_outs[0], ort_outs[1]
+        except Exception as e:
+            # Fallback if somehow using v3
+            print(f"VAD session run error: {e}")
+            return False
         
         speech_prob = out.squeeze()
         return bool(speech_prob > self.threshold)
