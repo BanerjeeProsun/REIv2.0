@@ -9,7 +9,7 @@ class AudioCaptureError(Exception):
 class AudioCapture:
     """Captures raw audio from the microphone into an asyncio queue."""
 
-    def __init__(self, sample_rate: int = 16000, channels: int = 1, chunk_size: int = 512) -> None:
+    def __init__(self, sample_rate: int = 16000, channels: int = 1, chunk_size: int = 480) -> None:
         self.sample_rate = sample_rate
         self.channels = channels
         self.chunk_size = chunk_size
