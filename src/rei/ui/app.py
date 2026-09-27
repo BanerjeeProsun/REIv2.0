@@ -137,12 +137,56 @@ class ChatPage(QWidget):
     def add_message(self, text: str, is_user: bool = False):
         lbl = QLabel(text)
         lbl.setWordWrap(True)
+        lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        # Ensure it sizes correctly with word wrap
+        lbl.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Minimum)
+        
         if is_user:
-            lbl.setStyleSheet("color: white; background: rgba(229,192,123,0.1); padding: 10px; border-radius: 8px;")
+            lbl.setStyleSheet("color: white; background: rgba(229,192,123,0.15); padding: 12px; border-radius: 8px; font-size: 14px;")
             self.chat_layout.addWidget(lbl, alignment=Qt.AlignmentFlag.AlignRight)
         else:
-            lbl.setStyleSheet("color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;")
+            lbl.setStyleSheet("color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.08); padding: 12px; border-radius: 8px; font-size: 14px;")
             self.chat_layout.addWidget(lbl, alignment=Qt.AlignmentFlag.AlignLeft)
+
+class ActivityPage(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        title = QLabel("Activity")
+        title.setStyleSheet("color: white; font-size: 20px; font-weight: bold;")
+        layout.addWidget(title)
+        
+        self.ledger = QFrame()
+        self.ledger.setStyleSheet("background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;")
+        ll = QVBoxLayout(self.ledger)
+        ll.addWidget(QLabel("<span style='color: #E5C07B; font-family: monospace;'>10:24</span> Opened Visual Studio Code (App)"))
+        ll.addWidget(QLabel("<span style='color: #E5C07B; font-family: monospace;'>10:22</span> Read file: research_paper.pdf (File)"))
+        ll.addWidget(QLabel("<span style='color: #E5C07B; font-family: monospace;'>10:20</span> Web request -> api.weather.com (Web)"))
+        ll.addWidget(QLabel("<span style='color: rgba(255,255,255,0.4); font-family: monospace;'>10:18</span> <span style='color: #E81123;'>Delete files (cancelled)</span>"))
+        ll.addStretch()
+        layout.addWidget(self.ledger)
+
+class MemoryPage(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        title = QLabel("Memory")
+        title.setStyleSheet("color: white; font-size: 20px; font-weight: bold;")
+        layout.addWidget(title)
+        
+        search = QLineEdit()
+        search.setPlaceholderText("Search memories...")
+        search.setStyleSheet("background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 6px 12px;")
+        layout.addWidget(search)
+        
+        mem_frame = QFrame()
+        mem_frame.setStyleSheet("background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;")
+        ml = QVBoxLayout(mem_frame)
+        ml.addWidget(QLabel("<b>User prefers Python for coding</b><br><span style='color: gray; font-size: 11px;'>Preference · 2 days ago</span>"))
+        ml.addWidget(QLabel("<b>Lives in London</b><br><span style='color: gray; font-size: 11px;'>Personal · 1 week ago</span>"))
+        ml.addWidget(QLabel("<b>Prefers dark theme</b><br><span style='color: gray; font-size: 11px;'>Preference · 2 weeks ago</span>"))
+        ml.addStretch()
+        layout.addWidget(mem_frame)
 
 class CapabilitiesPage(QWidget):
     def __init__(self):
@@ -221,19 +265,55 @@ class ReiUI(QMainWindow):
         super().__init__()
         self.setWindowTitle("Rei v2.0")
         self.setMinimumSize(900, 600)
-        self.setStyleSheet("background-color: #0B0B0C; color: white;")
         
-        self.central = QWidget()
-        self.setCentralWidget(self.central)
+        # Make the main window frameless for a modern look
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
-        self.main_layout = QHBoxLayout(self.central)
+        # Wrap everything in a main container to apply border radius
+        self.main_container = QFrame()
+        self.main_container.setStyleSheet("background-color: #0B0B0C; color: white; border: 1px solid rgba(229,192,123,0.2); border-radius: 10px;")
+        self.setCentralWidget(self.main_container)
+        
+        self.app_layout = QVBoxLayout(self.main_container)
+        self.app_layout.setContentsMargins(0, 0, 0, 0)
+        self.app_layout.setSpacing(0)
+        
+        # --- Custom Title Bar ---
+        self.title_bar = QWidget()
+        self.title_bar.setFixedHeight(30)
+        self.title_bar.setStyleSheet("background: transparent; border: none;")
+        title_layout = QHBoxLayout(self.title_bar)
+        title_layout.setContentsMargins(15, 0, 10, 0)
+        
+        title_lbl = QLabel("Rei")
+        title_lbl.setStyleSheet("color: rgba(255,255,255,0.5); font-weight: bold;")
+        title_layout.addWidget(title_lbl)
+        title_layout.addStretch()
+        
+        close_btn = QPushButton("X")
+        close_btn.setFixedSize(30, 30)
+        close_btn.setStyleSheet("QPushButton { background: transparent; color: white; border: none; font-weight: bold; } QPushButton:hover { background: #E81123; }")
+        close_btn.clicked.connect(self.close)
+        title_layout.addWidget(close_btn)
+        
+        self.app_layout.addWidget(self.title_bar)
+        
+        # Allow dragging window by title bar
+        self.title_bar.mousePressEvent = self._title_press
+        self.title_bar.mouseMoveEvent = self._title_move
+        
+        # --- Main Content Area ---
+        self.content_area = QWidget()
+        self.main_layout = QHBoxLayout(self.content_area)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
+        self.app_layout.addWidget(self.content_area)
         
         # Sidebar
         self.sidebar = QFrame()
         self.sidebar.setFixedWidth(220)
-        self.sidebar.setStyleSheet("background-color: #121214; border-right: 1px solid rgba(255,255,255,0.05);")
+        self.sidebar.setStyleSheet("background-color: transparent; border-right: 1px solid rgba(255,255,255,0.05); border-radius: 0px;")
         self.sidebar_layout = QVBoxLayout(self.sidebar)
         self.sidebar_layout.setContentsMargins(10, 20, 10, 20)
         
@@ -266,8 +346,8 @@ class ReiUI(QMainWindow):
         self.pages.setStyleSheet("background-color: #0B0B0C;")
         
         self.chat_page = ChatPage()
-        self.activity_page = QWidget() # Placeholder
-        self.memory_page = QWidget() # Placeholder
+        self.activity_page = ActivityPage()
+        self.memory_page = MemoryPage()
         self.caps_page = CapabilitiesPage()
         self.settings_page = SettingsPage()
         
@@ -314,6 +394,16 @@ class ReiUI(QMainWindow):
     def update_volume(self, vol: float) -> None:
         self.compact_orb.orb.set_volume(vol)
         
+    def _title_press(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+            
+    def _title_move(self, event):
+        if event.buttons() == Qt.MouseButton.LeftButton:
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+
     def showEvent(self, event):
         super().showEvent(event)
         # Position compact orb in top right of screen
