@@ -105,7 +105,7 @@ def main() -> None:
     orchestrator = create_orchestrator()
 
     # Start voice loop in background
-    asyncio.create_task(start_voice_loop(orchestrator, ui))
+    loop.create_task(start_voice_loop(orchestrator, ui))
 
     with loop:
         loop.run_forever()
