@@ -50,4 +50,5 @@ class VoiceActivityDetector:
             return False
         
         speech_prob = out.squeeze()
+        print(f'[VAD] prob: {speech_prob:.5f}')
         return bool(speech_prob > self.threshold)
