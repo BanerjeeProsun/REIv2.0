@@ -5,11 +5,11 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 from qasync import QEventLoop # type: ignore
+from dotenv import load_dotenv
 
 from rei.ui.app import ReiUI
 from rei.core.orchestrator import Orchestrator
 from rei.models.nim_planner import CloudAssistedPlanner
-from rei.models.adapter import ModelAdapter
 from rei.intents.parser import IntentParser
 from rei.core.prompt_builder import PromptBuilder
 from rei.policy.engine import PolicyEngine
@@ -28,6 +28,9 @@ from rei.voice.tts import TextToSpeech
 from rei.voice.aec import EchoCanceller
 from rei.voice.loop import VoiceLoop
 from rei.core.cancellation import CancelToken
+from rei.models.adapter import ModelAdapter
+
+load_dotenv()
 
 def create_orchestrator() -> Orchestrator:
     grant_key = secrets.token_bytes(32)
@@ -66,7 +69,7 @@ def create_orchestrator() -> Orchestrator:
 async def start_voice_loop(orchestrator: Orchestrator, ui: ReiUI) -> None:
     try:
         capture = AudioCapture()
-        vad = VoiceActivityDetector(Path("models/silero_vad.onnx"))
+        vad = VoiceActivityDetector(Path("models/silero_vad.onnx"), threshold=0.3)
         stt = SpeechToText()
         tts = TextToSpeech(Path("models/kokoro-v0_19.onnx"))
         aec = EchoCanceller()

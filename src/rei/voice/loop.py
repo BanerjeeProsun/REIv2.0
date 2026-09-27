@@ -55,6 +55,8 @@ class VoiceLoop:
                 is_speech = self.vad.process_chunk(chunk)
                 
                 if is_speech:
+                    if len(self._speech_buffer) == 0:
+                        print("Speech started...")
                     self._speech_buffer.append(chunk)
                     self._silence_frames = 0
                 elif len(self._speech_buffer) > 0:
@@ -62,6 +64,7 @@ class VoiceLoop:
                     self._speech_buffer.append(chunk) # Include trailing silence
                     
                     if self._silence_frames >= self.silence_threshold_chunks:
+                        print("Speech ended, processing...")
                         # We have reached the end of an utterance
                         await self._handle_utterance()
                         
