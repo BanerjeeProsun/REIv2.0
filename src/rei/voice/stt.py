@@ -6,12 +6,13 @@ from pathlib import Path
 
 # Add pip-installed NVIDIA DLLs to PATH for CTranslate2 GPU support
 try:
-    site_packages = site.getsitepackages()[0]
-    nvidia_base = Path(site_packages) / "nvidia"
-    cublas_path = nvidia_base / "cublas" / "bin"
-    cudnn_path = nvidia_base / "cudnn" / "bin"
-    if cublas_path.exists() and cudnn_path.exists():
-        os.environ["PATH"] = f"{cublas_path};{cudnn_path};{os.environ.get('PATH', '')}"
+    for sp in site.getsitepackages():
+        nvidia_base = Path(sp) / "nvidia"
+        cublas_path = nvidia_base / "cublas" / "bin"
+        cudnn_path = nvidia_base / "cudnn" / "bin"
+        if cublas_path.exists() and cudnn_path.exists():
+            os.environ["PATH"] = f"{cublas_path};{cudnn_path};{os.environ.get('PATH', '')}"
+            break
 except Exception:
     pass
 
