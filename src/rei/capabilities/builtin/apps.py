@@ -37,14 +37,17 @@ apps_open_spec = CapabilitySpec(
 
 
 def apps_open_handler(args: OpenAppArgs) -> dict[str, str]:
+    import subprocess
     path = APP_PATHS.get(args.app)
     if not path:
         raise ValueError(f"App {args.app} not found in allowlist")
 
-    # Launched via CreateProcess in rei.host.launch eventually
-    # For now, we mock the launch to satisfy the linter
-    print(f"Mock launch: {path}")
-    return {"status": "success", "app": args.app}
+    try:
+        subprocess.Popen(path)
+        print(f"Launched: {path}")
+        return {"status": "success", "app": args.app}
+    except Exception as e:
+        raise ValueError(f"Failed to launch {args.app}: {e}")
 
 
 class CloseAppArgs(BaseModel):

@@ -8,7 +8,7 @@ class VADError(Exception):
 class VoiceActivityDetector:
     """WebRTC VAD wrapper for precise voice detection (VOI-01)."""
 
-    def __init__(self, model_path: Path | None = None, threshold: float = 1, sample_rate: int = 16000) -> None:
+    def __init__(self, model_path: Path | None = None, threshold: float = 2, sample_rate: int = 16000) -> None:
         self.sample_rate = sample_rate
         self.vad = webrtcvad.Vad(int(threshold))
         self._last_prob = 0.0 # dummy for debug prints
