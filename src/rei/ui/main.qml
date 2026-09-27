@@ -7,417 +7,447 @@ ApplicationWindow {
     id: mainWindow
     visible: true
     width: 900
-    height: 600
+    height: 650
     flags: Qt.Window | Qt.FramelessWindowHint
     color: "transparent"
 
-    // Main background
+    // Custom properties
+    readonly property color bgColor: "#0A0A0B"
+    readonly property color borderColor: "#222222"
+    readonly property color goldColor: "#E5C07B"
+    readonly property color textGray: "#888888"
+    readonly property color activeBg: "#1C1914"
+
     Rectangle {
+        id: bgRect
         anchors.fill: parent
-        color: "#0B0B0C"
+        color: bgColor
         radius: 12
-        border.color: Qt.rgba(229/255, 192/255, 123/255, 0.15)
+        border.color: borderColor
         border.width: 1
         clip: true
 
-        // Title Bar
-        Rectangle {
-            id: titleBar
-            width: parent.width; height: 40
-            color: "transparent"
-            
-            MouseArea {
-                anchors.fill: parent
-                property point clickPos: "0,0"
-                onPressed: (mouse) => { clickPos = Qt.point(mouse.x, mouse.y) }
-                onPositionChanged: (mouse) => {
-                    mainWindow.x += mouse.x - clickPos.x
-                    mainWindow.y += mouse.y - clickPos.y
-                }
-            }
-            
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left; anchors.leftMargin: 20
-                text: "Rei v2.0"
-                color: Qt.rgba(1,1,1,0.4)
-                font.pixelSize: 12
-                font.family: "Segoe UI"
-            }
-
-            Rectangle {
-                anchors.right: parent.right
-                anchors.rightMargin: 15
-                anchors.verticalCenter: parent.verticalCenter
-                width: 30; height: 30
-                radius: 15
-                color: Qt.rgba(255,255,255,0.05)
-                
-                Text {
-                    anchors.centerIn: parent
-                    text: "X"
-                    color: "white"
-                    font.bold: true
-                }
-                
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onEntered: parent.color = "#E81123"
-                    onExited: parent.color = Qt.rgba(255,255,255,0.05)
-                    onClicked: Qt.quit()
-                }
+        // Drag handle for the whole background
+        MouseArea {
+            anchors.fill: parent
+            property point clickPos: "0,0"
+            onPressed: (mouse) => { clickPos = Qt.point(mouse.x, mouse.y) }
+            onPositionChanged: (mouse) => {
+                mainWindow.x += mouse.x - clickPos.x
+                mainWindow.y += mouse.y - clickPos.y
             }
         }
 
-        // Body
-        RowLayout {
-            anchors.top: titleBar.bottom
+        // --- TOP HEADER ---
+        Item {
+            id: topHeader
+            width: parent.width
+            height: 60
+            z: 10
+
+            // Logo
+            RowLayout {
+                anchors.left: parent.left
+                anchors.leftMargin: 25
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 10
+
+                Rectangle {
+                    width: 14; height: 14; radius: 7
+                    color: "transparent"
+                    border.color: goldColor
+                    border.width: 2
+                }
+                Text {
+                    text: "Rei"
+                    color: "white"
+                    font.pixelSize: 16
+                    font.bold: true
+                    font.family: "Segoe UI"
+                }
+            }
+
+            // Window Controls
+            RowLayout {
+                anchors.right: parent.right
+                anchors.rightMargin: 20
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 15
+
+                Text { text: "—"; color: textGray; font.pixelSize: 12; font.bold: true; MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: mainWindow.showMinimized() } }
+                Text { text: "□"; color: textGray; font.pixelSize: 16; font.bold: true; MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor } }
+                Text { text: "✕"; color: textGray; font.pixelSize: 14; font.bold: true; MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: Qt.quit() } }
+            }
+        }
+
+        // --- SIDEBAR ---
+        Item {
+            id: sidebar
+            width: 220
+            anchors.top: topHeader.bottom
             anchors.bottom: parent.bottom
             anchors.left: parent.left
-            anchors.right: parent.right
-            spacing: 0
 
-            // Sidebar
-            Rectangle {
-                Layout.fillHeight: true
-                Layout.preferredWidth: 220
-                color: "#121214"
-                border.color: Qt.rgba(255,255,255,0.05)
-                border.width: 1
+            ColumnLayout {
+                id: sideNav
+                anchors.fill: parent
+                anchors.topMargin: 10
+                anchors.leftMargin: 15
+                anchors.rightMargin: 15
+                spacing: 5
+                property int activeIndex: 0
 
-                ColumnLayout {
-                    id: sideNav
-                    anchors.fill: parent
-                    anchors.margins: 15
-                    spacing: 8
-                    property int activeIndex: 0
+                ListModel {
+                    id: navModel
+                    ListElement { name: "Chat"; icon: "💬" }
+                    ListElement { name: "Activity"; icon: "⏱" }
+                    ListElement { name: "Memory"; icon: "🧠" }
+                    ListElement { name: "Capabilities"; icon: "⚡" }
+                    ListElement { name: "Settings"; icon: "⚙" }
+                }
 
-                    Text {
-                        text: "Rei"
-                        color: "#E5C07B"
-                        font.pixelSize: 26
-                        font.bold: true
-                        font.family: "Segoe UI"
-                        Layout.bottomMargin: 20
-                        Layout.leftMargin: 10
-                    }
+                Repeater {
+                    model: navModel
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 40
+                        radius: 8
+                        color: sideNav.activeIndex === index ? activeBg : "transparent"
 
-                    ListModel {
-                        id: navModel
-                        ListElement { name: "Chat"; pageIdx: 0 }
-                        ListElement { name: "Activity"; pageIdx: 1 }
-                        ListElement { name: "Memory"; pageIdx: 2 }
-                        ListElement { name: "Capabilities"; pageIdx: 3 }
-                        ListElement { name: "Settings"; pageIdx: 4 }
-                    }
-
-                    Repeater {
-                        model: navModel
-                        Rectangle {
-                            width: parent.width; height: 42
-                            radius: 8
-                            color: sideNav.activeIndex === index ? Qt.rgba(229/255, 192/255, 123/255, 0.1) : "transparent"
-                            
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 15
+                            spacing: 12
                             Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.left: parent.left; anchors.leftMargin: 15
+                                text: icon
+                                color: sideNav.activeIndex === index ? goldColor : textGray
+                                font.pixelSize: 14
+                            }
+                            Text {
                                 text: name
-                                color: sideNav.activeIndex === index ? "#E5C07B" : Qt.rgba(1,1,1,0.6)
+                                color: sideNav.activeIndex === index ? goldColor : textGray
                                 font.pixelSize: 14
                                 font.family: "Segoe UI"
                                 font.bold: sideNav.activeIndex === index
                             }
+                        }
 
-                            MouseArea {
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                onEntered: { if (sideNav.activeIndex !== index) parent.color = Qt.rgba(255,255,255,0.02) }
-                                onExited: { if (sideNav.activeIndex !== index) parent.color = "transparent" }
-                                onClicked: sideNav.activeIndex = index
-                            }
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onEntered: { if (sideNav.activeIndex !== index) parent.color = Qt.rgba(255,255,255,0.03) }
+                            onExited: { if (sideNav.activeIndex !== index) parent.color = "transparent" }
+                            onClicked: sideNav.activeIndex = index
                         }
                     }
-                    Item { Layout.fillHeight: true }
                 }
+                Item { Layout.fillHeight: true }
             }
+        }
 
-            // Main Content
-            StackLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                currentIndex: sideNav.activeIndex
+        // --- MAIN CONTENT ---
+        StackLayout {
+            anchors.top: topHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.left: sidebar.right
+            anchors.right: parent.right
+            currentIndex: sideNav.activeIndex
 
-                // Page 0: Chat
-                Item {
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 20
-                        
-                        ListModel { id: chatModel }
-                        Connections {
-                            target: backend
-                            function onMessageAdded(text, is_user) {
-                                chatModel.append({"msgText": text, "isUser": is_user})
-                            }
+            // Page 0: Chat
+            Item {
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 25
+                    spacing: 20
+
+                    ListModel { id: chatModel }
+                    Connections {
+                        target: backend
+                        function onMessageAdded(text, is_user) {
+                            chatModel.append({"msgText": text, "isUser": is_user})
                         }
-                        
-                        ListView {
-                            id: chatList
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            model: chatModel
-                            spacing: 15
-                            delegate: Item {
-                                width: chatList.width
-                                height: bubble.height
-                                Rectangle {
-                                    id: bubble
-                                    color: isUser ? Qt.rgba(229/255,192/255,123/255,0.15) : Qt.rgba(255/255,255/255,255/255,0.05)
-                                    radius: 12
-                                    width: Math.min(msgLabel.implicitWidth + 30, chatList.width * 0.7)
-                                    height: msgLabel.implicitHeight + 24
-                                    anchors.right: isUser ? parent.right : undefined
-                                    anchors.left: isUser ? undefined : parent.left
+                    }
 
-                                    Text {
-                                        id: msgLabel
-                                        text: msgText
-                                        color: isUser ? "white" : Qt.rgba(1,1,1,0.85)
-                                        anchors.centerIn: parent
-                                        width: parent.width - 30
-                                        wrapMode: Text.WordWrap
-                                        font.pixelSize: 14
-                                        font.family: "Segoe UI"
-                                    }
+                    ListView {
+                        id: chatList
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        model: chatModel
+                        spacing: 20
+                        clip: true
+                        delegate: Item {
+                            width: chatList.width
+                            height: isUser ? userBubble.height : reiMsg.height
+
+                            // Rei Message (Left, no bubble, gold circle)
+                            RowLayout {
+                                id: reiMsg
+                                visible: !isUser
+                                width: parent.width * 0.8
+                                spacing: 15
+                                anchors.left: parent.left
+                                Rectangle {
+                                    Layout.alignment: Qt.AlignTop
+                                    Layout.topMargin: 5
+                                    width: 10; height: 10; radius: 5
+                                    color: "transparent"
+                                    border.color: goldColor; border.width: 1.5
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: msgText
+                                    color: "white"
+                                    font.pixelSize: 15
+                                    font.family: "Segoe UI"
+                                    wrapMode: Text.WordWrap
                                 }
                             }
-                            onCountChanged: Qt.callLater(() => chatList.positionViewAtEnd())
+
+                            // User Message (Right, dark gray bubble)
+                            Rectangle {
+                                id: userBubble
+                                visible: isUser
+                                color: "#1A1A1A"
+                                radius: 12
+                                width: Math.min(userText.implicitWidth + 30, chatList.width * 0.7)
+                                height: userText.implicitHeight + 24
+                                anchors.right: parent.right
+                                Text {
+                                    id: userText
+                                    text: msgText
+                                    color: "white"
+                                    anchors.centerIn: parent
+                                    width: parent.width - 30
+                                    wrapMode: Text.WordWrap
+                                    font.pixelSize: 15
+                                    font.family: "Segoe UI"
+                                }
+                            }
                         }
-                        
-                        Rectangle {
-                            Layout.fillWidth: true
-                            height: 48
-                            radius: 24
-                            color: Qt.rgba(255,255,255,0.03)
-                            border.color: Qt.rgba(255,255,255,0.1)
-                            
+                        onCountChanged: Qt.callLater(() => chatList.positionViewAtEnd())
+                    }
+
+                    // Input Box (Pill)
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 50
+                        radius: 25
+                        color: "transparent"
+                        border.color: "#333333"
+                        border.width: 1
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 15
+                            anchors.rightMargin: 20
+                            spacing: 15
+
+                            // Plus icon
+                            Rectangle {
+                                width: 24; height: 24; radius: 12
+                                color: "transparent"; border.color: textGray; border.width: 1
+                                Text { text: "+"; color: textGray; anchors.centerIn: parent; font.pixelSize: 16 }
+                            }
+
                             TextInput {
-                                anchors.fill: parent
-                                anchors.margins: 15
+                                Layout.fillWidth: true
                                 color: "white"
-                                font.pixelSize: 14
+                                font.pixelSize: 15
                                 font.family: "Segoe UI"
                                 verticalAlignment: TextInput.AlignVCenter
                                 clip: true
                                 Text {
                                     text: "Talk or type..."
-                                    color: Qt.rgba(1,1,1,0.3)
+                                    color: textGray
                                     visible: !parent.text
                                     anchors.verticalCenter: parent.verticalCenter
                                     font.family: "Segoe UI"
-                                    font.pixelSize: 14
+                                    font.pixelSize: 15
                                 }
                             }
+
+                            Text { text: "🎤"; color: textGray; font.pixelSize: 16 }
                         }
                     }
                 }
+            }
 
-                // Page 1: Activity
-                Item {
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 30
-                        spacing: 20
-                        Text { text: "Activity"; color: "white"; font.pixelSize: 22; font.bold: true; font.family: "Segoe UI" }
-                        
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            color: Qt.rgba(255,255,255,0.02)
-                            radius: 12
-                            border.color: Qt.rgba(255,255,255,0.1)
-                            
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 25
-                                spacing: 20
-                                Text { text: "<font color='#E5C07B' face='monospace'>10:24</font> &nbsp;&nbsp; Opened Visual Studio Code (App)"; color: "white"; font.pixelSize: 14 }
-                                Text { text: "<font color='#E5C07B' face='monospace'>10:22</font> &nbsp;&nbsp; Read file: research_paper.pdf (File)"; color: "white"; font.pixelSize: 14 }
-                                Text { text: "<font color='#E5C07B' face='monospace'>10:20</font> &nbsp;&nbsp; Web request -> api.weather.com (Web)"; color: "white"; font.pixelSize: 14 }
-                                Text { text: "<font color='gray' face='monospace'>10:18</font> &nbsp;&nbsp; <font color='#E81123'>Delete files (cancelled)</font>"; color: "white"; font.pixelSize: 14 }
-                                Item { Layout.fillHeight: true }
-                            }
+            // Page 1: Activity
+            Item {
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 30
+                    spacing: 20
+                    RowLayout {
+                        Rectangle { width: 14; height: 14; radius: 7; color: "transparent"; border.color: goldColor; border.width: 2 }
+                        Text { text: "Activity"; color: "white"; font.pixelSize: 20; font.bold: true; font.family: "Segoe UI" }
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        color: "#0F0F10"
+                        radius: 12
+                        border.color: borderColor
+                        ColumnLayout {
+                            anchors.fill: parent; anchors.margins: 25; spacing: 20
+                            Text { text: "<font color='#E5C07B' face='monospace'>10:24</font> &nbsp;&nbsp; Opened Visual Studio Code"; color: "white"; font.pixelSize: 14 }
+                            Text { text: "<font color='#E5C07B' face='monospace'>10:22</font> &nbsp;&nbsp; Read file: research_paper.pdf"; color: "white"; font.pixelSize: 14 }
+                            Item { Layout.fillHeight: true }
                         }
                     }
                 }
+            }
 
-                // Page 2: Memory
-                Item {
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 30
+            // Page 2: Memory
+            Item {
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 30
+                    spacing: 20
+                    RowLayout {
+                        Rectangle { width: 14; height: 14; radius: 7; color: "transparent"; border.color: goldColor; border.width: 2 }
+                        Text { text: "Memory"; color: "white"; font.pixelSize: 20; font.bold: true; font.family: "Segoe UI" }
+                    }
+                    Rectangle { Layout.fillWidth: true; height: 46; radius: 23; color: "transparent"; border.color: "#333333"
+                        Text { text: "Search memories..."; color: textGray; anchors.verticalCenter: parent.verticalCenter; anchors.left: parent.left; anchors.leftMargin: 20; font.family: "Segoe UI"; font.pixelSize: 14 }
+                    }
+                    Item { Layout.fillHeight: true }
+                }
+            }
+
+            // Page 3: Capabilities
+            Item {
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 30
+                    spacing: 20
+                    RowLayout {
+                        Rectangle { width: 14; height: 14; radius: 7; color: "transparent"; border.color: goldColor; border.width: 2 }
+                        Text { text: "Capabilities"; color: "white"; font.pixelSize: 20; font.bold: true; font.family: "Segoe UI" }
+                    }
+                    RowLayout {
                         spacing: 20
-                        Text { text: "Memory"; color: "white"; font.pixelSize: 22; font.bold: true; font.family: "Segoe UI" }
-                        
-                        Rectangle {
-                            Layout.fillWidth: true
-                            height: 42
-                            radius: 21
-                            color: Qt.rgba(255,255,255,0.03)
-                            border.color: Qt.rgba(255,255,255,0.1)
-                            Text { text: "Search memories..."; color: "gray"; anchors.verticalCenter: parent.verticalCenter; anchors.left: parent.left; anchors.leftMargin: 20; font.family: "Segoe UI"; font.pixelSize: 14 }
+                        Repeater {
+                            model: ["All", "Applications", "Files", "Web", "System", "Devices"]
+                            Text { text: modelData; color: index === 0 ? "white" : textGray; font.pixelSize: 14; font.bold: index===0 }
                         }
-                        
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            color: Qt.rgba(255,255,255,0.02)
-                            radius: 12
-                            border.color: Qt.rgba(255,255,255,0.1)
-                            
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 25
-                                spacing: 25
-                                Text { text: "<b>User prefers Python for coding</b><br><font color='gray'>Preference · 2 days ago</font>"; color: "white"; font.pixelSize: 14; font.family: "Segoe UI" }
-                                Text { text: "<b>Lives in London</b><br><font color='gray'>Personal · 1 week ago</font>"; color: "white"; font.pixelSize: 14; font.family: "Segoe UI" }
-                                Item { Layout.fillHeight: true }
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true; Layout.fillHeight: true
+                        color: "#0F0F10"; radius: 12; border.color: borderColor
+                        ColumnLayout {
+                            anchors.fill: parent; anchors.margins: 25; spacing: 20
+                            RowLayout {
+                                Text { text: "📂"; color: "white" }
+                                Column {
+                                    Text { text: "Filesystem"; color: "white"; font.pixelSize: 15; font.bold: true }
+                                    Text { text: "Read, search, create, move, delete files."; color: textGray; font.pixelSize: 13 }
+                                }
+                                Item { Layout.fillWidth: true }
+                                Rectangle { width: 80; height: 30; radius: 6; color: "transparent"; border.color: "#333333"; Text { text: "Allowed v"; color: "white"; anchors.centerIn: parent; font.pixelSize: 12 } }
                             }
+                            Item { Layout.fillHeight: true }
                         }
                     }
                 }
+            }
 
-                // Page 3: Capabilities
-                Item {
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 30
-                        spacing: 20
-                        Text { text: "Capabilities"; color: "white"; font.pixelSize: 22; font.bold: true; font.family: "Segoe UI" }
-                        
-                        GridLayout {
-                            columns: 2
-                            columnSpacing: 20
-                            rowSpacing: 20
-                            Layout.fillWidth: true
-                            
-                            Repeater {
-                                model: ListModel {
-                                    ListElement { title: "Filesystem"; desc: "Read, search, create, move, delete files." }
-                                    ListElement { title: "Applications"; desc: "Open, close, control applications." }
-                                    ListElement { title: "Browser"; desc: "Web search, open links, retrieve content." }
-                                    ListElement { title: "System"; desc: "System information and utilities." }
-                                }
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    height: 85
-                                    color: Qt.rgba(255,255,255,0.02)
-                                    radius: 12
-                                    border.color: Qt.rgba(255,255,255,0.1)
-                                    
-                                    Column {
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        anchors.left: parent.left; anchors.leftMargin: 20
-                                        spacing: 4
-                                        Text { text: title; color: "#E5C07B"; font.pixelSize: 15; font.bold: true; font.family: "Segoe UI" }
-                                        Text { text: desc; color: "gray"; font.pixelSize: 13; font.family: "Segoe UI" }
-                                    }
-                                }
-                            }
-                        }
-                        Item { Layout.fillHeight: true }
+            // Page 4: Settings
+            Item {
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 30
+                    spacing: 20
+                    RowLayout {
+                        Rectangle { width: 14; height: 14; radius: 7; color: "transparent"; border.color: goldColor; border.width: 2 }
+                        Text { text: "Settings"; color: "white"; font.pixelSize: 20; font.bold: true; font.family: "Segoe UI" }
                     }
-                }
-
-                // Page 4: Settings
-                Item {
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 30
-                        spacing: 20
-                        Text { text: "Settings"; color: "white"; font.pixelSize: 22; font.bold: true; font.family: "Segoe UI" }
-                        
-                        Rectangle {
-                            Layout.fillWidth: true
-                            height: 120
-                            color: Qt.rgba(255,255,255,0.02)
-                            radius: 12
-                            border.color: Qt.rgba(255,255,255,0.1)
-                            
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 25
-                                spacing: 10
-                                Text { text: "Privacy Mode"; color: "white"; font.bold: true; font.pixelSize: 15; font.family: "Segoe UI" }
-                                RadioButton { 
-                                    text: "Local Only (No external network access)"
-                                    checked: true
-                                    contentItem: Text { text: parent.text; color: "white"; font.family: "Segoe UI"; leftPadding: parent.indicator.width + 10; verticalAlignment: Text.AlignVCenter }
-                                }
-                                RadioButton { 
-                                    text: "Cloud Assisted (Uses cloud models)"
-                                    contentItem: Text { text: parent.text; color: "white"; font.family: "Segoe UI"; leftPadding: parent.indicator.width + 10; verticalAlignment: Text.AlignVCenter }
-                                }
+                    RowLayout {
+                        spacing: 25
+                        Repeater {
+                            model: ["General", "Voice", "Privacy", "Models", "Memory", "Appearance"]
+                            Rectangle {
+                                width: 70; height: 30; radius: 15
+                                color: index === 0 ? "#1C1914" : "transparent"
+                                Text { text: modelData; color: index === 0 ? goldColor : textGray; anchors.centerIn: parent; font.pixelSize: 13; font.bold: index===0 }
                             }
                         }
-                        Item { Layout.fillHeight: true }
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true; Layout.fillHeight: true
+                        color: "#0F0F10"; radius: 12; border.color: borderColor
+                        ColumnLayout {
+                            anchors.fill: parent; anchors.margins: 25; spacing: 20
+                            Text { text: "Privacy Mode"; color: "white"; font.bold: true; font.pixelSize: 15 }
+                            RadioButton { text: "Local Only"; checked: true; contentItem: Text { text: parent.text; color: "white"; leftPadding: 30 } }
+                            RadioButton { text: "Cloud Assisted"; contentItem: Text { text: parent.text; color: "white"; leftPadding: 30 } }
+                            Item { Layout.fillHeight: true }
+                        }
                     }
                 }
             }
         }
     }
 
+    // --- COMPACT VOICE ORB (Window 14) ---
     Window {
         id: orbWindow
         visible: true
-        width: 260; height: 320
+        width: 300; height: 400
         flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
         color: "transparent"
-        x: Screen.desktopAvailableWidth - width - 30
+        x: Screen.desktopAvailableWidth - width - 40
         y: 40
 
         Rectangle {
             anchors.fill: parent
-            color: "#0B0B0C"
+            color: "#0A0A0B"
             radius: 16
-            border.color: Qt.rgba(229/255, 192/255, 123/255, 0.2)
+            border.color: "#222222"
             border.width: 1
 
             MouseArea {
                 anchors.fill: parent
                 property point clickPos: "0,0"
                 onPressed: (mouse) => { clickPos = Qt.point(mouse.x, mouse.y) }
-                onPositionChanged: (mouse) => {
-                    orbWindow.x += mouse.x - clickPos.x
-                    orbWindow.y += mouse.y - clickPos.y
-                }
+                onPositionChanged: (mouse) => { orbWindow.x += mouse.x - clickPos.x; orbWindow.y += mouse.y - clickPos.y }
             }
 
+            // Top header
+            RowLayout {
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 20
+                
+                RowLayout {
+                    spacing: 8
+                    Rectangle { width: 12; height: 12; radius: 6; color: "transparent"; border.color: "#E5C07B"; border.width: 1.5 }
+                    Text { text: "Rei"; color: "white"; font.pixelSize: 14; font.family: "Segoe UI" }
+                }
+                Item { Layout.fillWidth: true }
+                Text { text: "⚙"; color: "#888888"; font.pixelSize: 16 }
+            }
+
+            // Central Orb
             Item {
                 anchors.centerIn: parent
-                anchors.verticalCenterOffset: -20
-                width: 100; height: 100
+                anchors.verticalCenterOffset: -30
+                width: 120; height: 120
 
                 // Rings (Listening)
                 Repeater {
                     model: backend.state === "listening" ? 3 : 0
                     Rectangle {
                         anchors.centerIn: parent
-                        width: 80; height: 80
-                        radius: 40
+                        width: 100; height: 100
+                        radius: 50
                         color: "transparent"
                         border.color: "#E5C07B"
                         border.width: 1
-
-                        SequentialAnimation on scale {
-                            loops: Animation.Infinite
-                            NumberAnimation { from: 1.0; to: 2.2; duration: 2000 }
-                        }
-                        SequentialAnimation on opacity {
-                            loops: Animation.Infinite
-                            NumberAnimation { from: 0.5; to: 0.0; duration: 2000 }
-                        }
+                        SequentialAnimation on scale { loops: Animation.Infinite; NumberAnimation { from: 1.0; to: 2.0; duration: 2000 } }
+                        SequentialAnimation on opacity { loops: Animation.Infinite; NumberAnimation { from: 0.4; to: 0.0; duration: 2000 } }
                     }
                 }
 
@@ -429,47 +459,91 @@ ApplicationWindow {
                         var ctx = getContext("2d");
                         ctx.clearRect(0, 0, width, height);
                         ctx.beginPath();
-                        ctx.arc(width/2, height/2, 40, 0, Math.PI * 0.8);
+                        ctx.arc(width/2, height/2, 50, 0, Math.PI * 0.7);
                         ctx.strokeStyle = "#E5C07B";
                         ctx.lineWidth = 2;
                         ctx.stroke();
                     }
-                    RotationAnimation on rotation {
-                        from: 0; to: 360; duration: 1000; loops: Animation.Infinite; running: backend.state === "processing"
-                    }
+                    RotationAnimation on rotation { from: 0; to: 360; duration: 1000; loops: Animation.Infinite; running: backend.state === "processing" }
                 }
 
                 // Speaking Glow
                 Rectangle {
                     anchors.centerIn: parent
-                    width: 80 + (backend.volume * 60)
-                    height: 80 + (backend.volume * 60)
+                    width: 100 + (backend.volume * 80)
+                    height: 100 + (backend.volume * 80)
                     radius: width/2
-                    color: Qt.rgba(229/255, 192/255, 123/255, backend.volume * 0.5)
+                    color: Qt.rgba(229/255, 192/255, 123/255, backend.volume * 0.4)
                     visible: backend.state === "speaking"
                     Behavior on width { NumberAnimation { duration: 100 } }
                     Behavior on height { NumberAnimation { duration: 100 } }
                 }
 
-                // Core Idle / Processing BG
+                // Core Circle
                 Rectangle {
                     anchors.centerIn: parent
-                    width: 80; height: 80
-                    radius: 40
+                    width: 100; height: 100
+                    radius: 50
                     color: "transparent"
                     border.color: backend.state === "processing" ? Qt.rgba(229/255, 192/255, 123/255, 0.2) : "#E5C07B"
                     border.width: 2
                 }
             }
 
+            // Status Text
             Text {
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 40
-                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.centerIn: parent
+                anchors.verticalCenterOffset: 60
                 text: backend.status
                 color: "white"
-                font.pixelSize: 15
+                font.pixelSize: 16
                 font.family: "Segoe UI"
+            }
+
+            // Waveform (Simulated during speaking)
+            Row {
+                anchors.centerIn: parent
+                anchors.verticalCenterOffset: 100
+                spacing: 4
+                visible: backend.state === "speaking"
+                Repeater {
+                    model: 10
+                    Rectangle {
+                        width: 3
+                        height: 5 + (Math.random() * backend.volume * 30)
+                        radius: 1.5
+                        color: "#E5C07B"
+                        anchors.verticalCenter: parent.verticalCenter
+                        Timer {
+                            interval: 100; running: backend.state === "speaking"; repeat: true
+                            onTriggered: parent.height = 5 + (Math.random() * backend.volume * 30)
+                        }
+                        Behavior on height { NumberAnimation { duration: 100 } }
+                    }
+                }
+            }
+
+            // Cancel Button
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 25
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: 120; height: 36
+                radius: 18
+                color: "#1A1A1A"
+                border.color: "#333333"
+                RowLayout {
+                    anchors.centerIn: parent
+                    spacing: 8
+                    Text { text: "✕"; color: "white"; font.pixelSize: 12 }
+                    Text { text: "Cancel"; color: "white"; font.pixelSize: 14; font.family: "Segoe UI" }
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onEntered: parent.color = "#2A2A2A"
+                    onExited: parent.color = "#1A1A1A"
+                }
             }
         }
     }
