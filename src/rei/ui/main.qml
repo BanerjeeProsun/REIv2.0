@@ -99,11 +99,11 @@ ApplicationWindow {
 
                 ListModel {
                     id: navModel
-                    ListElement { name: "Chat"; icon: "💬" }
-                    ListElement { name: "Activity"; icon: "⏱" }
-                    ListElement { name: "Memory"; icon: "🧠" }
-                    ListElement { name: "Capabilities"; icon: "⚡" }
-                    ListElement { name: "Settings"; icon: "⚙" }
+                    ListElement { name: "Chat"; icon: "" }
+                    ListElement { name: "Activity"; icon: "" }
+                    ListElement { name: "Memory"; icon: "" }
+                    ListElement { name: "Capabilities"; icon: "" }
+                    ListElement { name: "Settings"; icon: "" }
                 }
 
                 Repeater {
@@ -118,11 +118,7 @@ ApplicationWindow {
                             anchors.fill: parent
                             anchors.leftMargin: 15
                             spacing: 12
-                            Text {
-                                text: icon
-                                color: sideNav.activeIndex === index ? goldColor : textGray
-                                font.pixelSize: 14
-                            }
+                            
                             Text {
                                 text: name
                                 color: sideNav.activeIndex === index ? goldColor : textGray
@@ -548,3 +544,5 @@ ApplicationWindow {
         }
     }
 }
+
+
