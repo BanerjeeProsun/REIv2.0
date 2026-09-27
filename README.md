@@ -1,74 +1,54 @@
-# Rei
-Local-first AI operating layer for Windows.
+# Rei v2.0
 
-Rei is an AI assistant architecture rebuilt from the ground up to ensure strict security, user privacy, and high performance. It adheres strictly to the principle that model output is an intent, never an action.
+Rei v2.0 is a local-first, privacy-obsessed AI operating layer for Windows. It acts as a hyper-fast intelligent bridge between your voice and your operating system. Built completely from scratch with a strict security architecture, Rei guarantees that **model output is an intent, never an execution**. 
 
-## Core Principles
+Rei processes audio natively, thinks using a quantized local model, and executes typed capabilities securely—all without requiring an active internet connection or relying on a fragile cloud infrastructure.
 
-1. Strict Security Boundaries
-Model outputs are treated as untrusted data. They are parsed into typed intents, evaluated by a deterministic policy engine, and require cryptographic GrantTokens before execution. Arbitrary shell access is entirely prohibited.
+## 🚀 Current Features & Architecture
 
-2. Privacy by Default
-Rei operates natively in a local-only mode. All network egress is explicitly categorized and routed through a single constrained egress broker. User content such as clipboard data, screen contents, and private documents is classified as Secret and never leaves the device.
+* **The Core Orchestrator (8-Stage Pipeline):** Every request passes through a strict, side-effect-free parsing pipeline. The LLM cannot execute code; it can only propose strongly-typed JSON intents that are verified against a capability registry and a deterministic Policy Engine.
+* **Hybrid Intelligence (`ModelRouter`):** Features a seamless dynamic fallback router. Rei attempts to use a Cloud-assisted NIM model (Llama 3.2 11B) for complex logic, but if the API fails, times out, or loses internet connection, the thought is instantly routed to a lightweight `Llama 3.2 1B Instruct` GGUF model running entirely locally via `llama-cpp-python`.
+* **Hardware-Accelerated Voice Engine:**
+  * **STT:** `faster-whisper` running natively on the GPU. Includes dynamic CUDA injection (automatically discovers NVIDIA cuBLAS libraries in the python environment to avoid system PATH pollution) and rigorous hallucination filtering.
+  * **TTS:** `kokoro-onnx` for lightning-fast, ultra-natural local speech synthesis.
+  * **VAD:** `webrtcvad` configured for highly aggressive noise-gating to prevent continuous transcription loops from background static.
+* **Figma-Perfect QML UI:** A world-class, hardware-accelerated frontend built with **PySide6 and QML (Qt Quick)**. It perfectly replicates the sleek, minimalist vector aesthetics of the original Figma reference, featuring a massive dark-mode control center and a floating, animated Voice Orb that pulses to audio waveforms.
+* **Zero-Password Secure Memory:** A persistent SQLite `MemoryStore` for user preferences and context, cryptographically secured at rest using **Windows DPAPI**. The database is intrinsically locked to the user's OS login, rendering it unreadable to external threats without requiring a master password.
+* **Core Capabilities:** Full OS-level integrations for locking the workstation, managing power states, directly injecting keystrokes into active windows (`system.type_text`), scaling global audio volume (`pycaw`), and downloading files.
 
-3. Deterministic Policy
-A side-effect-free policy engine evaluates all actions based on capability tiers, origin, and taint state. Untrusted external content is structurally isolated and propagated as taint, ensuring that no prompt injection can bypass the capability authorization flow.
+## 🗺️ Roadmap & Future Plans
 
-## Architecture Structure
+As we push towards the ultimate goal of a frictionless, invisible OS layer, the following milestones are planned:
 
-The repository is organized into five strict trust zones:
-* Untrusted Sources: External content wrappers and sanitizers.
-* UI Process: Interface rendering and audio capture.
-* Rei Core: Pipeline orchestration, policy evaluation, and capability intent parsing.
-* Capability Host: The isolated execution environment processing typed capability side effects.
-* Egress Broker: The single, restricted network client.
+### 1. Headless Background Integrations (Zero-Click Capabilities)
+We will expand the Capability Registry to interact with third-party cloud services headlessly, bypassing the need for a web browser entirely:
+* **YouTube Music & Spotify:** Integrations via `ytmusicapi` and `spotipy` to allow Rei to securely authenticate and stream music through the OS mixer in the background.
+* **Gmail Integration:** Utilizing `google-api-python-client` with OAuth2 tokens (safely stored in the DPAPI memory vault) to read, summarize, and draft emails silently.
 
-## Development Progress
+### 2. Deep OS Integration & UX
+* **System Tray & Global Hotkeys:** Minimizing the UI to a lightweight system tray background process. The floating Orb will trigger instantly over any application via a global hook (e.g., `Ctrl + Space`).
+* **Vector Iconography:** Dropping in a full SVG library (like Lucide or Phosphor) to complete the QML UI's transition to a pixel-perfect modern application.
 
-### Phase P0 and P1 Completed
-The foundational architecture, security boundaries, and local containment infrastructure have been fully implemented and verified:
-* Canonical Runtime and Pipeline: A strict 8-stage execution pipeline is in place.
-* Process Supervisor: Job Object backed process supervision with crash loop protection.
-* Capability Registry: Legacy shell execution has been completely replaced by a typed capability registry using strict Pydantic schemas.
-* Policy Engine: A pure, deterministic policy engine evaluates intents based on integrity, kill switches, origin, taint, and data classification.
-* Cryptographic Grants: Verified GrantTokens enforce that execution only occurs with explicit engine approval.
-* Privacy Modes and Egress Gate: Implementation of the socket guard, redactor, and egress broker to enforce zero-egress guarantees in local mode.
-* Content Guard and Taint Propagation: Untrusted inputs are sandboxed inside envelopes, propagating taint across the execution pipeline to block prompt injections.
-* Confirmation Broker: Interactive UI card routing for high-risk capabilities requiring explicit user approval.
-* Named-Pipe IPC: High-security inter-process communication using Windows Named Pipes, restricted by user SID and client PID, fully replacing vulnerable HTTP localhost endpoints.
-* Memory and Configuration: Data is stored in SQLite encrypted at rest via Windows DPAPI. Secrets are stored strictly in the Windows Credential Manager.
-* Observability: Cryptographically chained audit logs with recursive PII and secret redaction.
-* CI Gates: Reproducible builds locked via uv.lock and models.lock, strict typing, import boundaries, and comprehensive unit tests.
+### 3. Advanced Hardening (Phase P3)
+* **Sandboxed Capability Host:** Segregating the Executor from the main Orchestrator into a dedicated, low-privilege subprocess to guarantee that rogue capabilities cannot compromise the core pipeline.
+* **Egress Broker & Firewall:** Enforcing stringent firewall rules so that only designated, sanitized HTTP clients can connect to the internet, strictly prohibiting unauthorized model callbacks.
 
-### Phase P2 Completed (Orchestrator & Voice Pipeline)
-* End-to-End Orchestrator: The 8-stage pipeline is fully wired, connecting the model adapter, intent parser, policy engine, and executor.
-* Model Adapters: `ModelAdapter` interface with support for local GGUF models (`llama-cpp-python`) and `FakeModel` for test determinism.
-* Voice Pipeline: Local-first audio processing loop featuring Silero VAD (voice activity detection), Faster Whisper (speech-to-text), and Kokoro TTS (text-to-speech) wrappers, with stubbed acoustic echo cancellation (AEC).
-* Terminal Harness: A fully functional `rei.demo` module proving the pipeline works end-to-end via text input.
+## 🛠️ Technology Stack
 
-### Coming Soon
-* Phase P2 (UI & Polish): PySide6 interface, Quarantined Reader mode for summarizing untrusted content without side effects, and constrained decoding optimizations for models.
-* Phase P3 (Advanced Hardening): Process separation for the capability host, Windows Firewall rules per mode, external penetration testing, and Authenticode signing.
+Rei is built on the absolute bleeding edge of local AI technologies:
+* **Frontend:** PySide6, Qt Quick / QML
+* **Backend:** Python 3.12 (uv package manager), asyncio, Pydantic
+* **AI & Inference:** llama-cpp-python, faster-whisper, kokoro-onnx
+* **Security:** Windows DPAPI, strict JSON schema validation, Typed Intents
 
-## Development
+## 📦 Getting Started
 
-Prerequisites:
-* Python 3.11 or higher
-* uv (Python package manager)
+*(Development requires Windows 11, `uv`, and an NVIDIA GPU).*
 
-Setup the repository:
-```cmd
-uv sync --all-extras
+```bash
+# Clone the repository
+git clone https://github.com/BanerjeeProsun/REIv2.0.git
+
+# Run Rei (uv will automatically sync the virtual environment and lockfile)
+uv run python -m rei.main
 ```
-
-Run tests and linters:
-```cmd
-uv run ruff check src tests
-uv run mypy src tests
-uv run lint-imports
-uv run pytest tests
-```
-
-## Documentation
-
-Authoritative architecture details, delivery phases, and the threat model are defined in the Architecture Bible located in the docs directory.
