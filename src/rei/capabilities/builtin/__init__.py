@@ -14,6 +14,7 @@ from rei.capabilities.builtin.system import (
     system_power_handler,
 )
 from rei.capabilities.builtin.files import files_download_spec, files_download_handler
+from rei.capabilities.builtin.memory import memory_remember_spec, memory_remember_handler
 
 
 def register_builtin(registry: CapabilityRegistry) -> None:
@@ -25,6 +26,7 @@ def register_builtin(registry: CapabilityRegistry) -> None:
     registry.register(system_lock_spec, system_lock_handler)
     registry.register(system_power_spec, system_power_handler)
     registry.register(files_download_spec, files_download_handler)
+    registry.register(memory_remember_spec, memory_remember_handler)
 
 
 __all__ = ["register_builtin"]

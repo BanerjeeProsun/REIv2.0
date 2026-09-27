@@ -37,11 +37,18 @@ def create_orchestrator() -> Orchestrator:
     registry = CapabilityRegistry()
     register_builtin(registry)
 
+    from rei.memory.db import MemoryStore
+    from rei.capabilities.builtin.memory import set_memory_store
+    
+    app_data = Path(os.getenv("APPDATA", ".")) / "Rei"
+    store = MemoryStore(app_data / "rei.db")
+    set_memory_store(store)
+    
     policy_config = {
         "version": "2026.09.1",
         "defaults": {"safe_mode": False},
         "disabled": {"capabilities": []},
-        "preauthorise": {"allowed": ["apps.open", "media.set_volume", "web.open_url"]},
+        "preauthorise": {"allowed": ["apps.open", "media.set_volume", "web.open_url", "memory.remember"]},
     }
 
     policy_engine = PolicyEngine(registry, policy_config, grant_key)
@@ -60,7 +67,7 @@ def create_orchestrator() -> Orchestrator:
         registry=registry,
         policy_engine=policy_engine,
         parser=IntentParser(),
-        prompt_builder=PromptBuilder(),
+        prompt_builder=PromptBuilder(store=store),
         confirmation_broker=ConfirmationBroker(UIClientMock()),
         executor=Executor(registry, GrantVerifier(registry, grant_key)),
     )
@@ -93,7 +100,10 @@ async def start_voice_loop(orchestrator: Orchestrator, ui: ReiUI) -> None:
         ui.set_status("Rei: Listening...")
         return result.reply
 
-    loop = VoiceLoop(capture, vad, stt, tts, aec, handle_utterance)
+    def handle_volume(vol: float) -> None:
+        ui.update_volume(vol)
+
+    loop = VoiceLoop(capture, vad, stt, tts, aec, handle_utterance, on_volume=handle_volume)
     await loop.start()
 
 

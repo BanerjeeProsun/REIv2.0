@@ -25,15 +25,26 @@ class PromptBuilder:
         "IMPORTANT: Never output anything other than JSON.\n"
     )
 
+    def __init__(self, store=None):
+        self.store = store
+
     def build(
         self,
         utterance: str,
         capabilities: list[CapabilitySpec],
     ) -> str:
         cap_block = self._format_capabilities(capabilities)
+        memory_block = ""
+        if self.store:
+            memories = self.store.get_all()
+            if memories:
+                import json
+                memory_block = f"Long-term Memories:\n{json.dumps(memories, indent=2)}\n\n"
+        
         return (
             f"{self.SYSTEM_PREFIX}\n"
             f"Available capabilities:\n{cap_block}\n\n"
+            f"{memory_block}"
             f"User said: {utterance}\n\n"
             f"Respond with JSON:"
         )

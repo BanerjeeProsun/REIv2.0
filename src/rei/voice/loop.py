@@ -20,7 +20,8 @@ class VoiceLoop:
         stt: SpeechToText,
         tts: TextToSpeech,
         aec: EchoCanceller,
-        on_utterance: Callable[[str], Awaitable[str]]
+        on_utterance: Callable[[str], Awaitable[str]],
+        on_volume: Callable[[float], None] = lambda v: None
     ) -> None:
         self.capture = capture
         self.vad = vad
@@ -28,6 +29,7 @@ class VoiceLoop:
         self.tts = tts
         self.aec = aec
         self.on_utterance = on_utterance
+        self.on_volume = on_volume
         self._running = False
         self._speech_buffer: list[np.ndarray] = []
         self._silence_frames = 0
@@ -46,6 +48,9 @@ class VoiceLoop:
             try:
                 # Get raw audio chunk from microphone
                 chunk = await self.capture.get_chunk()
+                
+                vol = float(np.max(np.abs(chunk)))
+                self.on_volume(vol)
                 
                 chunk_count += 1
                 # Check AEC to avoid transcribing our own TTS
