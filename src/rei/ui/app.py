@@ -31,6 +31,9 @@ class ReiUI(QMainWindow):
     def set_status(self, status: str) -> None:
         self.status_label.setText(status)
 
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        QApplication.quit()
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self.drag_pos = event.globalPos() - self.frameGeometry().topLeft()
