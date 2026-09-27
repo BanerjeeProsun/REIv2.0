@@ -23,9 +23,7 @@ class TextToSpeech:
             try:
                 from kokoro_onnx import Kokoro
                 # Need voices.bin in the same dir as the model or specified
-                voices_path = model_path.parent / "voices.json"
-                if not voices_path.exists():
-                    voices_path = model_path.parent / "voices.bin"
+                voices_path = model_path.parent / "voices.bin"
                     
                 self.kokoro = Kokoro(str(model_path), str(voices_path))
                 print("Loaded Kokoro TTS.")
