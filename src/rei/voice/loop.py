@@ -93,8 +93,8 @@ class VoiceLoop:
         if not self._speech_buffer:
             return
             
-        # Concatenate buffered chunks into a single array
-        full_audio = np.concatenate(self._speech_buffer)
+        # Concatenate buffered chunks into a single 1D array
+        full_audio = np.concatenate(self._speech_buffer).flatten()
         self._reset_vad()
         
         # STT
