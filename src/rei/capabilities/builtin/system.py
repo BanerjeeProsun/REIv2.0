@@ -1,5 +1,5 @@
 from typing import Literal
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from rei.capabilities.spec import CapabilitySpec, RiskTier, DataClass, RateLimit
 from rei.policy.schemas import PrivacyMode
 
