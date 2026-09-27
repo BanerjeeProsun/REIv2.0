@@ -33,8 +33,7 @@ def media_set_volume_handler(args: SetVolumeArgs) -> dict[str, str | int]:
     from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume # type: ignore
 
     devices = AudioUtilities.GetSpeakers()
-    interface = devices.Activate(
-        IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+    interface = devices.EndpointVolume if hasattr(devices, "EndpointVolume") else devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
     volume = cast(interface, POINTER(IAudioEndpointVolume))
     
     # pycaw uses a scalar from 0.0 to 1.0
