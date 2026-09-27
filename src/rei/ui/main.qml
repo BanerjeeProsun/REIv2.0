@@ -353,11 +353,11 @@ ApplicationWindow {
                                 RadioButton { 
                                     text: "Local Only (No external network access)"
                                     checked: true
-                                    contentItem: Text { text: parent.text; color: "white"; font.family: "Segoe UI"; leftMargin: parent.indicator.width + 10; verticalAlignment: Text.AlignVCenter }
+                                    contentItem: Text { text: parent.text; color: "white"; font.family: "Segoe UI"; leftPadding: parent.indicator.width + 10; verticalAlignment: Text.AlignVCenter }
                                 }
                                 RadioButton { 
                                     text: "Cloud Assisted (Uses cloud models)"
-                                    contentItem: Text { text: parent.text; color: "white"; font.family: "Segoe UI"; leftMargin: parent.indicator.width + 10; verticalAlignment: Text.AlignVCenter }
+                                    contentItem: Text { text: parent.text; color: "white"; font.family: "Segoe UI"; leftPadding: parent.indicator.width + 10; verticalAlignment: Text.AlignVCenter }
                                 }
                             }
                         }
