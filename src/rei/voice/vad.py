@@ -10,7 +10,9 @@ class VoiceActivityDetector:
 
     def __init__(self, model_path: Path | None = None, threshold: float = 3, sample_rate: int = 16000) -> None:
         self.sample_rate = sample_rate
-        self.vad = webrtcvad.Vad(int(threshold))
+        # Ensure threshold is 0, 1, 2, or 3 for WebRTC
+        level = max(0, min(3, int(round(threshold))))
+        self.vad = webrtcvad.Vad(level)
         self._last_prob = 0.0 # dummy for debug prints
         
     def reset(self) -> None:

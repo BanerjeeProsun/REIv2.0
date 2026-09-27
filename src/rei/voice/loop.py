@@ -21,7 +21,8 @@ class VoiceLoop:
         tts: TextToSpeech,
         aec: EchoCanceller,
         on_utterance: Callable[[str], Awaitable[str]],
-        on_volume: Callable[[float], None] = lambda v: None
+        on_volume: Callable[[float], None] = lambda v: None,
+        on_status: Callable[[str], None] = lambda s: None
     ) -> None:
         self.capture = capture
         self.vad = vad
@@ -30,6 +31,7 @@ class VoiceLoop:
         self.aec = aec
         self.on_utterance = on_utterance
         self.on_volume = on_volume
+        self.on_status = on_status
         self._running = False
         self._speech_buffer: list[np.ndarray] = []
         self._silence_frames = 0
@@ -106,6 +108,7 @@ class VoiceLoop:
             if not text.strip():
                 return
                 
+            self.on_status(f"Heard: {text}")
             print(f"Heard: {text}")
             
             # Send to Orchestrator (via callback)

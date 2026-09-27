@@ -46,8 +46,7 @@ class LocalPlanner(ModelAdapter):
                 formatted_prompt,
                 max_tokens=512,
                 stop=["<|eot_id|>"],
-                temperature=0.0,
-                response_format={"type": "json_object"}
+                temperature=0.0
             )
             return output["choices"][0]["text"].strip() # type: ignore
             

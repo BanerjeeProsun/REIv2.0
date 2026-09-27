@@ -88,7 +88,7 @@ def create_orchestrator() -> Orchestrator:
 async def start_voice_loop(orchestrator: Orchestrator, ui: ReiUI) -> None:
     try:
         capture = AudioCapture()
-        vad = VoiceActivityDetector(Path("models/silero_vad.onnx"), threshold=0.3)
+        vad = VoiceActivityDetector(Path("models/silero_vad.onnx"), threshold=3)
         stt = SpeechToText()
         tts = TextToSpeech(Path("models/kokoro-v0_19.onnx"))
         aec = EchoCanceller()
@@ -115,7 +115,7 @@ async def start_voice_loop(orchestrator: Orchestrator, ui: ReiUI) -> None:
     def handle_volume(vol: float) -> None:
         ui.update_volume(vol)
 
-    loop = VoiceLoop(capture, vad, stt, tts, aec, handle_utterance, on_volume=handle_volume)
+    loop = VoiceLoop(capture, vad, stt, tts, aec, handle_utterance, on_volume=handle_volume, on_status=ui.set_status)
     await loop.start()
 
 
