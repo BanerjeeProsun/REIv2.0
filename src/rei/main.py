@@ -49,7 +49,7 @@ def create_orchestrator() -> Orchestrator:
         "version": "2026.09.1",
         "defaults": {"safe_mode": False},
         "disabled": {"capabilities": []},
-        "preauthorise": {"allowed": ["apps.open", "media.set_volume", "web.open_url", "memory.remember"]},
+        "preauthorise": {"allowed": ["apps.open", "media.set_volume", "web.open_url", "memory.remember", "system.type_text"]},
     }
 
     policy_engine = PolicyEngine(registry, policy_config, grant_key)

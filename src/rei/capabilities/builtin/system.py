@@ -65,3 +65,31 @@ def system_power_handler(args: SystemPowerArgs) -> dict[str, str]:
     elif args.action == "restart":
         os.system("shutdown /r /t 1")
     return {"status": "success", "action": args.action}
+
+class TypeTextArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    text: str = Field(..., max_length=1000)
+
+system_type_text_spec = CapabilitySpec(
+    id="system.type_text",
+    version=1,
+    summary="Type text as if using the keyboard. Useful for writing messages or documents.",
+    tier=RiskTier.R2,
+    args_model=TypeTextArgs,
+    reads=frozenset(),
+    returns=DataClass.C0,
+    network=False,
+    reversible=False,
+    allow_when_tainted=True,
+    confirm_template="Type text: {text}",
+    timeout_s=10.0,
+    rate_limit=RateLimit(limit=50, period_s=60),
+    modes=frozenset([PrivacyMode.LOCAL_ONLY, PrivacyMode.LOCAL_PLUS_WEB, PrivacyMode.CLOUD_ASSISTED]),
+)
+
+def system_type_text_handler(args: TypeTextArgs) -> dict[str, str]:
+    import pyautogui
+    import time
+    time.sleep(0.5) # Give OS a moment if app was just launched
+    pyautogui.write(args.text, interval=0.01)
+    return {"status": "success", "text_typed": args.text}

@@ -43,7 +43,14 @@ class SpeechToText:
         try:
             text = await loop.run_in_executor(None, _transcribe_sync)
             cancel_token.raise_if_cancelled()
-            return text
+            
+            # Filter common Whisper hallucinations
+            clean_text = text.strip()
+            hallucinations = ["Thank you.", "I didn't quite catch that.", "Bye.", "Thanks for watching!", "Amara.org", "You", "Thank you"]
+            if clean_text in hallucinations:
+                return ""
+            
+            return clean_text
         except asyncio.CancelledError:
             raise
         except Exception as e:
