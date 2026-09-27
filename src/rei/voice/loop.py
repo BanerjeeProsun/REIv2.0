@@ -118,8 +118,11 @@ class VoiceLoop:
                     await self.tts.speak(response_text, cancel_token)
                 finally:
                     self.aec.mark_playback_active(False)
+                    self.capture.clear()
                     
         except asyncio.CancelledError:
             print("Voice turn cancelled.")
         except Exception as e:
             print(f"Failed to process utterance: {e}")
+        finally:
+            self.capture.clear()

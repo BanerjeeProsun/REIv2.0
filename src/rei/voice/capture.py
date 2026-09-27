@@ -20,14 +20,25 @@ class AudioCapture:
     def _audio_callback(
         self, indata: np.ndarray, frames: int, time_info: dict[str, Any], status: sd.CallbackFlags
     ) -> None:
-        if status:
+        if status and status.input_overflow:
+            pass # ignore expected overflow
+        elif status:
             print(f"Audio capture warning: {status}")
-        try:
-            # We must use put_nowait because we are in a separate thread callback
-            self.loop.call_soon_threadsafe(self.queue.put_nowait, indata.copy())
-        except asyncio.QueueFull:
-            # If the queue is full, we drop frames. This prevents memory leaks.
-            pass
+            
+        def _safe_put():
+            try:
+                self.queue.put_nowait(indata.copy())
+            except asyncio.QueueFull:
+                pass
+                
+        self.loop.call_soon_threadsafe(_safe_put)
+
+    def clear(self) -> None:
+        while not self.queue.empty():
+            try:
+                self.queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
 
     async def start(self) -> None:
         if self.stream is not None:
