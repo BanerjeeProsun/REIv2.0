@@ -17,41 +17,56 @@ class TextToSpeech:
         self.sample_rate = sample_rate
         self.stream: sd.OutputStream | None = None
         self._playback_task: asyncio.Future[Any] | None = None
-
-        if model_path:
-            # Here we would initialize the real Kokoro ONNX model
-            # For the current phase demo, we just stub it unless weights are provided
-            pass
+        
+        self.kokoro = None
+        if model_path and model_path.exists():
+            try:
+                from kokoro_onnx import Kokoro
+                # Need voices.bin in the same dir as the model or specified
+                voices_path = model_path.parent / "voices.json"
+                if not voices_path.exists():
+                    voices_path = model_path.parent / "voices.bin"
+                    
+                self.kokoro = Kokoro(str(model_path), str(voices_path))
+                print("Loaded Kokoro TTS.")
+            except Exception as e:
+                print(f"Failed to load Kokoro: {e}")
 
     async def speak(self, text: str, cancel_token: CancelToken) -> None:
-        """Synthesize and play audio for the given text."""
         cancel_token.raise_if_cancelled()
         
-        # 1. Synthesize audio (mocked for now to avoid large model downloads in CI)
-        # In a real run, this calls the Kokoro model.
-        audio = self._synthesize(text)
+        loop = asyncio.get_running_loop()
         
-        # 2. Play audio
-        cancel_token.raise_if_cancelled()
-        await self._play_audio(audio, cancel_token)
-
-    def _synthesize(self, text: str) -> np.ndarray:
-        """Mock synthesis: generates a simple 440Hz beep scaled by text length."""
-        duration = min(len(text) * 0.05, 3.0) # 50ms per character, max 3 seconds
-        t = np.linspace(0, duration, int(self.sample_rate * duration), False)
-        
-        # A simple beep
-        note = np.sin(440 * 2 * np.pi * t)
-        
-        # Envelope to avoid clicks
-        fade_len = int(0.05 * self.sample_rate)
-        if len(note) > fade_len * 2:
-            fade_in = np.linspace(0, 1, fade_len)
-            fade_out = np.linspace(1, 0, fade_len)
-            note[:fade_len] *= fade_in
-            note[-fade_len:] *= fade_out
+        if self.kokoro:
+            # 1. Synthesize audio
+            def _synth() -> np.ndarray:
+                samples, _ = self.kokoro.create(text, voice=self.voice, speed=1.0, lang="en-us")
+                return samples
             
-        return note.astype(np.float32)
+            try:
+                audio = await loop.run_in_executor(None, _synth)
+            except Exception as e:
+                raise TTSError(f"Kokoro synthesis failed: {e}")
+                
+            cancel_token.raise_if_cancelled()
+            await self._play_audio(audio, cancel_token)
+        else:
+            # Fallback to pyttsx3 (SAPI5)
+            import pyttsx3 # type: ignore
+            engine = pyttsx3.init()
+            # Run blocking speak in executor
+            def _speak_sync() -> None:
+                engine.say(text)
+                engine.runAndWait()
+            self._playback_task = loop.run_in_executor(None, _speak_sync)
+            try:
+                await asyncio.wait([self._playback_task], return_when=asyncio.FIRST_COMPLETED)
+            except asyncio.CancelledError:
+                engine.stop()
+                raise
+            finally:
+                self._playback_task = None
+
 
     async def _play_audio(self, audio: np.ndarray, cancel_token: CancelToken) -> None:
         """Plays audio using sounddevice, allowing barge-in cancellation."""
@@ -60,9 +75,6 @@ class TextToSpeech:
         def _callback(outdata: np.ndarray, frames: int, time: dict[str, Any], status: sd.CallbackFlags) -> None:
             if status:
                 print(f"TTS playback warning: {status}")
-            
-            # This is a simplification. A real implementation needs a ring buffer.
-            # For now we use sd.play which is easier but blocking, so we'll run it in an executor.
             pass
 
         def _play_sync() -> None:
@@ -72,7 +84,6 @@ class TextToSpeech:
         self._playback_task = loop.run_in_executor(None, _play_sync)
         
         try:
-            # Wait for playback to finish, or cancellation
             done, pending = await asyncio.wait(
                 [self._playback_task],
                 timeout=None,

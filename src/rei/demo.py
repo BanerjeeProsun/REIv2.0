@@ -9,11 +9,13 @@ parse intents, evaluate policy, issue grants, and execute capabilities.
 
 import asyncio
 import secrets
+from pathlib import Path
 
 from rei.core.orchestrator import Orchestrator
 from rei.core.cancellation import CancelToken
 from rei.core.prompt_builder import PromptBuilder
 from rei.models.fake import FakeModel
+from rei.models.adapter import ModelAdapter
 from rei.intents.parser import IntentParser
 from rei.policy.engine import PolicyEngine
 from rei.policy.context import PolicyContext
@@ -42,7 +44,16 @@ def create_orchestrator() -> Orchestrator:
     policy_engine = PolicyEngine(registry, policy_config, grant_key)
     parser = IntentParser()
     prompt_builder = PromptBuilder()
-    model = FakeModel()
+    
+    # Use the real Llama model we just migrated
+    model_path = Path("models/Llama-3.2-1B-Instruct-Q4_K_M.gguf")
+    model: ModelAdapter
+    if model_path.exists():
+        from rei.models.local_planner import LocalPlanner
+        model = LocalPlanner(model_path)
+    else:
+        model = FakeModel()
+
     broker = ConfirmationBroker(UIClientMock())
     verifier = GrantVerifier(registry, grant_key)
     executor = Executor(registry, verifier)

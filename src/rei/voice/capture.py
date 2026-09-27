@@ -17,7 +17,9 @@ class AudioCapture:
         self.stream: sd.InputStream | None = None
         self.loop = asyncio.get_running_loop()
 
-    def _audio_callback(self, indata: np.ndarray, frames: int, time_info: dict[str, Any], status: sd.CallbackFlags) -> None:
+    def _audio_callback(
+        self, indata: np.ndarray, frames: int, time_info: dict[str, Any], status: sd.CallbackFlags
+    ) -> None:
         if status:
             print(f"Audio capture warning: {status}")
         try:

@@ -11,7 +11,7 @@ class LocalPlanner(ModelAdapter):
 
     def __init__(self, model_path: Path, n_ctx: int = 4096, n_threads: int | None = None) -> None:
         try:
-            from llama_cpp import Llama # type: ignore
+            from llama_cpp import Llama
         except ImportError:
             raise LocalPlannerError(
                 "llama-cpp-python is not installed. Please install it to use LocalPlanner."
