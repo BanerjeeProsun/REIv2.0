@@ -41,10 +41,16 @@ class VoiceLoop:
         
         print("Voice loop started. Listening...")
         
+        chunk_count = 0
         while self._running:
             try:
                 # Get raw audio chunk from microphone
                 chunk = await self.capture.get_chunk()
+                
+                chunk_count += 1
+                if chunk_count % 30 == 0:  # ~ Every 1 second
+                    vol = np.max(np.abs(chunk))
+                    print(f"[Debug] Current mic volume: {vol:.5f}")
                 
                 # Check AEC to avoid transcribing our own TTS
                 if self.aec.should_suppress():
