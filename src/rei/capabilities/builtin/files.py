@@ -28,5 +28,18 @@ files_download_spec = CapabilitySpec(
 
 
 def files_download_handler(args: DownloadFileArgs) -> dict[str, str]:
-    print(f"Mock downloading file from {args.url} as {args.name}")
-    return {"status": "success", "file": args.name}
+    import httpx
+    import os
+    from pathlib import Path
+    
+    downloads_dir = Path(os.environ["USERPROFILE"]) / "Downloads"
+    downloads_dir.mkdir(exist_ok=True)
+    target_path = downloads_dir / args.name
+    
+    with httpx.stream("GET", str(args.url), follow_redirects=True) as response:
+        response.raise_for_status()
+        with open(target_path, "wb") as f:
+            for chunk in response.iter_bytes(chunk_size=8192):
+                f.write(chunk)
+                
+    return {"status": "success", "file": str(target_path)}

@@ -27,7 +27,8 @@ system_lock_spec = CapabilitySpec(
 
 
 def system_lock_handler(args: SystemLockArgs) -> dict[str, str]:
-    print("Mock locking system")
+    import ctypes
+    ctypes.windll.user32.LockWorkStation()
     return {"status": "success", "action": "lock"}
 
 
@@ -58,5 +59,9 @@ system_power_spec = CapabilitySpec(
 
 
 def system_power_handler(args: SystemPowerArgs) -> dict[str, str]:
-    print(f"Mock system power action: {args.action}")
+    import os
+    if args.action == "shutdown":
+        os.system("shutdown /s /t 1")
+    elif args.action == "restart":
+        os.system("shutdown /r /t 1")
     return {"status": "success", "action": args.action}

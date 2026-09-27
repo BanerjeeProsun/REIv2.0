@@ -28,8 +28,19 @@ media_set_volume_spec = CapabilitySpec(
 
 
 def media_set_volume_handler(args: SetVolumeArgs) -> dict[str, str | int]:
-    # Mocking Core Audio API interaction
-    print(f"Mock setting volume to: {args.level}")
+    from ctypes import cast, POINTER
+    from comtypes import CLSCTX_ALL # type: ignore
+    from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume # type: ignore
+
+    devices = AudioUtilities.GetSpeakers()
+    interface = devices.Activate(
+        IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+    volume = cast(interface, POINTER(IAudioEndpointVolume))
+    
+    # pycaw uses a scalar from 0.0 to 1.0
+    scalar = args.level / 100.0
+    volume.SetMasterVolumeLevelScalar(scalar, None)
+    
     return {"status": "success", "volume": args.level}
 
 
@@ -60,6 +71,22 @@ media_control_spec = CapabilitySpec(
 
 
 def media_control_handler(args: MediaControlArgs) -> dict[str, str]:
-    # Mocking SMTC API interaction
-    print(f"Mock media control: {args.action}")
+    import ctypes
+    # Virtual-Key Codes for Media Control
+    VK_MEDIA_NEXT_TRACK = 0xB0
+    VK_MEDIA_PREV_TRACK = 0xB1
+    VK_MEDIA_PLAY_PAUSE = 0xB3
+    
+    key_map = {
+        "play": VK_MEDIA_PLAY_PAUSE,
+        "pause": VK_MEDIA_PLAY_PAUSE,
+        "next": VK_MEDIA_NEXT_TRACK,
+        "prev": VK_MEDIA_PREV_TRACK
+    }
+    
+    vk = key_map.get(args.action)
+    if vk:
+        ctypes.windll.user32.keybd_event(vk, 0, 0, 0)
+        ctypes.windll.user32.keybd_event(vk, 0, 2, 0) # Key up
+        
     return {"status": "success", "action": args.action}
