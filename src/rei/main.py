@@ -54,17 +54,25 @@ def create_orchestrator() -> Orchestrator:
 
     policy_engine = PolicyEngine(registry, policy_config, grant_key)
     
-    # Phase P4: Fully Local Intelligence
+    # Phase P4: Multi-Model Intelligence with Fallback
+    from rei.models.nim_planner import CloudAssistedPlanner
     from rei.models.local_planner import LocalPlanner
+    from rei.models.router import ModelRouter
     
+    try:
+        cloud_model = CloudAssistedPlanner("meta/llama-3.2-11b-vision-instruct")
+    except Exception as e:
+        print(f"Failed to load NIM Planner: {e}")
+        cloud_model = None
+
     model_path = Path("models/Llama-3.2-1B-Instruct-Q4_K_M.gguf")
     try:
-        active_model = LocalPlanner(model_path, n_ctx=4096)
+        local_model = LocalPlanner(model_path, n_ctx=4096)
     except Exception as e:
         print(f"Failed to load Local Planner: {e}")
-        print("Falling back to FakeModel.")
-        from rei.models.fake import FakeModel
-        active_model = FakeModel()
+        local_model = None
+
+    active_model = ModelRouter(cloud_model=cloud_model, local_model=local_model)
 
     return Orchestrator(
         model=active_model,
@@ -94,7 +102,7 @@ async def start_voice_loop(orchestrator: Orchestrator, ui: ReiUI) -> None:
             session_id="voice-session",
             turn_id=f"turn-{secrets.token_hex(4)}",
             origin=Origin.USER_VOICE,
-            privacy_mode=PrivacyMode.LOCAL_ONLY,
+            privacy_mode=PrivacyMode.CLOUD_ASSISTED,
             taint=frozenset(),
             settings={},
             recent=None,
