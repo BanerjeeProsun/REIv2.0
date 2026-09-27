@@ -40,8 +40,14 @@ The foundational architecture, security boundaries, and local containment infras
 * Observability: Cryptographically chained audit logs with recursive PII and secret redaction.
 * CI Gates: Reproducible builds locked via uv.lock and models.lock, strict typing, import boundaries, and comprehensive unit tests.
 
+### Phase P2 Completed (Orchestrator & Voice Pipeline)
+* End-to-End Orchestrator: The 8-stage pipeline is fully wired, connecting the model adapter, intent parser, policy engine, and executor.
+* Model Adapters: `ModelAdapter` interface with support for local GGUF models (`llama-cpp-python`) and `FakeModel` for test determinism.
+* Voice Pipeline: Local-first audio processing loop featuring Silero VAD (voice activity detection), Faster Whisper (speech-to-text), and Kokoro TTS (text-to-speech) wrappers, with stubbed acoustic echo cancellation (AEC).
+* Terminal Harness: A fully functional `rei.demo` module proving the pipeline works end-to-end via text input.
+
 ### Coming Soon
-* Phase P2 (Engineering Quality and UX): Implementation of a Quarantined Reader mode for summarizing untrusted content without side effects, constrained decoding optimizations for models, and performance tuning for the Voice Activity Detection (VAD) and local Text-to-Speech (TTS) pipelines.
+* Phase P2 (UI & Polish): PySide6 interface, Quarantined Reader mode for summarizing untrusted content without side effects, and constrained decoding optimizations for models.
 * Phase P3 (Advanced Hardening): Process separation for the capability host, Windows Firewall rules per mode, external penetration testing, and Authenticode signing.
 
 ## Development
