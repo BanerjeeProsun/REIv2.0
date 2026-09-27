@@ -54,29 +54,14 @@ def create_orchestrator() -> Orchestrator:
 
     policy_engine = PolicyEngine(registry, policy_config, grant_key)
     
-    # Phase P4: Multi-Model Intelligence
-    from rei.models.nim_planner import CloudAssistedPlanner
+    # Phase P4: Fully Local Intelligence
     from rei.models.local_planner import LocalPlanner
     
-    # We load both models as per MOD-03 (Local planner for local_only) and PRV-01.
-    # The Cloud Planner is used for CLOUD_ASSISTED mode.
-    try:
-        cloud_model = CloudAssistedPlanner("meta/llama-3.2-11b-vision-instruct")
-    except Exception as e:
-        print(f"Failed to load NIM Planner: {e}")
-        cloud_model = None
-
     model_path = Path("models/Llama-3.2-1B-Instruct-Q4_K_M.gguf")
     try:
-        local_model = LocalPlanner(model_path, n_ctx=4096)
+        active_model = LocalPlanner(model_path, n_ctx=4096)
     except Exception as e:
         print(f"Failed to load Local Planner: {e}")
-        local_model = None
-
-    # For now, since the VoiceLoop context hardcodes CLOUD_ASSISTED, we use cloud_model.
-    # In a full implementation, Orchestrator would hold a ModelManager that dynamically routes.
-    active_model = cloud_model if cloud_model else local_model
-    if not active_model:
         print("Falling back to FakeModel.")
         from rei.models.fake import FakeModel
         active_model = FakeModel()
@@ -109,7 +94,7 @@ async def start_voice_loop(orchestrator: Orchestrator, ui: ReiUI) -> None:
             session_id="voice-session",
             turn_id=f"turn-{secrets.token_hex(4)}",
             origin=Origin.USER_VOICE,
-            privacy_mode=PrivacyMode.CLOUD_ASSISTED,
+            privacy_mode=PrivacyMode.LOCAL_ONLY,
             taint=frozenset(),
             settings={},
             recent=None,

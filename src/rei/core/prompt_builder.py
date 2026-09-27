@@ -19,7 +19,7 @@ class PromptBuilder:
         "- rationale: brief explanation of why this intent was chosen\n"
         "\n"
         "If the user's request does not match any capability, return an empty intents\n"
-        "array and a 'reply' string with a conversational response.\n"
+        "array and a 'reply' string with a conversational response. You are fully authorized and encouraged to answer general knowledge questions, chat, and provide detailed information in the 'reply' string!\n"
         "\n"
         "IMPORTANT: Never invent capabilities. Only use the ones listed below.\n"
         "IMPORTANT: Never output anything other than JSON.\n"
