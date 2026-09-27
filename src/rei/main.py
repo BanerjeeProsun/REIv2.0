@@ -49,7 +49,7 @@ def create_orchestrator() -> Orchestrator:
     # Phase P3: Use CloudAssistedPlanner
     model: ModelAdapter
     try:
-        model = CloudAssistedPlanner("meta/llama-3.2-90b-vision-instruct")
+        model = CloudAssistedPlanner("meta/llama-3.2-11b-vision-instruct")
     except Exception as e:
         print(f"Failed to load NIM Planner: {e}. Falling back to FakeModel.")
         from rei.models.fake import FakeModel
