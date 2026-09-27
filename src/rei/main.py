@@ -54,12 +54,14 @@ def create_orchestrator() -> Orchestrator:
 
     policy_engine = PolicyEngine(registry, policy_config, grant_key)
     
-    # Phase P3: Use CloudAssistedPlanner
+    # Phase P4: Fully Local Intelligence
+    from rei.models.local_planner import LocalPlanner
     model: ModelAdapter
+    model_path = Path("models/Llama-3.2-1B-Instruct-Q4_K_M.gguf")
     try:
-        model = CloudAssistedPlanner("meta/llama-3.2-11b-vision-instruct")
+        model = LocalPlanner(model_path, n_ctx=4096)
     except Exception as e:
-        print(f"Failed to load NIM Planner: {e}. Falling back to FakeModel.")
+        print(f"Failed to load Local Planner: {e}. Falling back to FakeModel.")
         from rei.models.fake import FakeModel
         model = FakeModel()
 
@@ -119,7 +121,8 @@ def main() -> None:
     orchestrator = create_orchestrator()
 
     # Start voice loop in background
-    loop.create_task(start_voice_loop(orchestrator, ui))
+    voice_task = loop.create_task(start_voice_loop(orchestrator, ui))
+    app.aboutToQuit.connect(voice_task.cancel)
 
     with loop:
         loop.run_forever()

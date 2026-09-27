@@ -36,14 +36,20 @@ class LocalPlanner(ModelAdapter):
         loop = asyncio.get_running_loop()
         
         def _generate_sync() -> str:
-            # Simple text generation
-            output = self.model(
-                prompt,
-                max_tokens=256,
-                stop=["User said:"],
-                echo=False
+            # Llama 3.2 Instruct format
+            formatted_prompt = (
+                f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n"
+                f"{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
             )
-            return output["choices"][0]["text"] # type: ignore
+            
+            output = self.model(
+                formatted_prompt,
+                max_tokens=256,
+                stop=["<|eot_id|>"],
+                echo=False,
+                temperature=0.0
+            )
+            return output["choices"][0]["text"].strip() # type: ignore
             
         try:
             # TODO: apply deadline_ms via asyncio.wait_for
