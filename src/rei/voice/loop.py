@@ -32,8 +32,8 @@ class VoiceLoop:
         self._speech_buffer: list[np.ndarray] = []
         self._silence_frames = 0
         
-        # 400ms of silence at 16kHz with 512 chunk size is roughly 12 chunks
-        self.silence_threshold_chunks = int(0.4 * capture.sample_rate / capture.chunk_size)
+        # 300ms of silence at 16kHz with 480 chunk size is roughly 10 chunks
+        self.silence_threshold_chunks = int(0.3 * capture.sample_rate / capture.chunk_size)
 
     async def start(self) -> None:
         self._running = True

@@ -9,11 +9,24 @@ class STTError(Exception):
 class SpeechToText:
     """Local Speech-to-Text using faster-whisper (VOI-01)."""
 
-    def __init__(self, model_size: str = "base", device: str = "cpu", compute_type: str = "int8") -> None:
+    def __init__(self, model_size: str = "base") -> None:
         try:
-            self.model = WhisperModel(model_size, device=device, compute_type=compute_type)
+            print("Loading Whisper on GPU (CUDA)...")
+            self.model = WhisperModel(model_size, device="cuda", compute_type="float16")
+            # Pre-warm the model
+            dummy_audio = np.zeros(16000, dtype=np.float32)
+            self.model.transcribe(dummy_audio, beam_size=1)
+            print("Whisper GPU Active.")
         except Exception as e:
-            raise STTError(f"Failed to load Whisper model: {e}")
+            print(f"GPU fallback triggered: {e}. Falling back to CPU...")
+            try:
+                self.model = WhisperModel(model_size, device="cpu", compute_type="int8")
+                # Pre-warm the model
+                dummy_audio = np.zeros(16000, dtype=np.float32)
+                self.model.transcribe(dummy_audio, beam_size=1)
+                print("Whisper CPU Active.")
+            except Exception as e2:
+                raise STTError(f"Failed to load Whisper model: {e2}")
 
     async def transcribe(self, audio: np.ndarray, cancel_token: CancelToken) -> str:
         """Transcribe an audio chunk. Audio must be 16kHz float32."""
