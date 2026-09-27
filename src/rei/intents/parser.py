@@ -26,7 +26,10 @@ class IntentParser:
             parsed_json = json.loads(json_str)
             
             if isinstance(parsed_json, dict):
-                parsed_json = [parsed_json]
+                if "intents" in parsed_json:
+                    parsed_json = parsed_json["intents"]
+                else:
+                    parsed_json = [parsed_json]
                 
             if not isinstance(parsed_json, list):
                 raise IntentParserError("Output must be a JSON array of intents")

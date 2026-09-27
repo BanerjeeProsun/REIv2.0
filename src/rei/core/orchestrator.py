@@ -1,67 +1,255 @@
+import asyncio
 from typing import Any
+from dataclasses import dataclass
+
 from rei.intents.schemas import IntentProposal
-from rei.policy.schemas import PolicyDecision
+from rei.intents.parser import IntentParser, IntentParserError
+from rei.policy.schemas import PolicyDecision, Verdict
+from rei.policy.engine import PolicyEngine
+from rei.policy.context import PolicyContext
 from rei.policy.grant import GrantToken
+from rei.core.cancellation import CancelToken
+from rei.core.prompt_builder import PromptBuilder
+from rei.models.adapter import ModelAdapter
+from rei.capabilities.registry import CapabilityRegistry
+from rei.confirm.broker import ConfirmationBroker
+from rei.core.executor import Executor
+from rei.audit.writer import AuditLogWriter
 
 
 class PipelineError(Exception):
     pass
 
 
+class PipelineDenied(PipelineError):
+    def __init__(self, reason: str, decision: PolicyDecision | None = None) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.decision = decision
+
+
+@dataclass
+class TurnResult:
+    success: bool
+    reply: str
+    intents: list[IntentProposal]
+    decisions: list[PolicyDecision]
+    execution_results: list[dict[str, Any]]
+    audit_events: list[dict[str, Any]]
+
+
 class Orchestrator:
-    async def process_turn(self, raw_input: Any, cancel_token: Any) -> Any:
+    """Wired 8-stage pipeline (ARC-01, ARC-02).
+
+    Every user request flows through exactly these stages.
+    Any failure routes to the DENY branch with zero side effects.
+    """
+
+    def __init__(
+        self,
+        model: ModelAdapter,
+        registry: CapabilityRegistry,
+        policy_engine: PolicyEngine,
+        parser: IntentParser,
+        prompt_builder: PromptBuilder,
+        confirmation_broker: ConfirmationBroker,
+        executor: Executor,
+        audit: AuditLogWriter | None = None,
+    ) -> None:
+        self.model = model
+        self.registry = registry
+        self.policy_engine = policy_engine
+        self.parser = parser
+        self.prompt_builder = prompt_builder
+        self.confirmation_broker = confirmation_broker
+        self.executor = executor
+        self.audit = audit
+
+    async def process_turn(
+        self,
+        raw_input: str,
+        ctx: PolicyContext,
+        cancel_token: CancelToken,
+    ) -> TurnResult:
+        audit_events: list[dict[str, Any]] = []
         try:
             # 1. Capture
-            user_utterance = await self._capture(raw_input)
+            utterance = self._capture(raw_input)
+            audit_events.append({"stage": "capture", "utterance": utterance})
 
             # 2. Propose
-            raw_output = await self._propose(user_utterance, cancel_token)
+            cancel_token.raise_if_cancelled()
+            raw_output = await self._propose(utterance, cancel_token)
+            audit_events.append({"stage": "propose", "output_len": len(raw_output)})
 
             # 3. Parse
-            intents = await self._parse(raw_output)
+            intents = self._parse(raw_output)
+            audit_events.append({
+                "stage": "parse",
+                "intent_count": len(intents),
+                "capabilities": [i.capability for i in intents],
+            })
 
-            # 4. Decide
-            decision = await self._decide(intents)
+            if not intents:
+                # Model returned conversational reply, no actions
+                return TurnResult(
+                    success=True,
+                    reply=self._extract_reply(raw_output),
+                    intents=[],
+                    decisions=[],
+                    execution_results=[],
+                    audit_events=audit_events,
+                )
 
-            # 5. Confirm
-            approved = await self._confirm(decision, cancel_token)
+            decisions: list[PolicyDecision] = []
+            execution_results: list[dict[str, Any]] = []
 
-            # 6. Grant
-            grant = await self._grant(approved)
+            for intent in intents:
+                cancel_token.raise_if_cancelled()
 
-            # 7. Execute
-            result = await self._execute(grant, cancel_token)
+                # 4. Decide
+                decision = self._decide(intent, ctx)
+                decisions.append(decision)
+                audit_events.append({
+                    "stage": "decide",
+                    "capability": intent.capability,
+                    "verdict": decision.verdict.name,
+                    "reasons": decision.reasons,
+                })
+
+                if decision.verdict == Verdict.DENY:
+                    continue
+
+                # 5. Confirm
+                if decision.verdict == Verdict.CONFIRM:
+                    approved = await self._confirm(intent, decision, cancel_token)
+                    audit_events.append({
+                        "stage": "confirm",
+                        "capability": intent.capability,
+                        "approved": approved,
+                    })
+                    if not approved:
+                        continue
+
+                # 6. Grant
+                grant, mac = self._grant(intent, ctx, decision)
+                audit_events.append({
+                    "stage": "grant",
+                    "grant_id": grant.grant_id,
+                    "capability": intent.capability,
+                })
+
+                # 7. Execute
+                result = self._execute(intent, grant, mac)
+                execution_results.append(result)
+                audit_events.append({
+                    "stage": "execute",
+                    "capability": intent.capability,
+                    "status": result.get("status", "unknown"),
+                })
 
             # 8. Report
-            return await self._report(result)
+            reply = self._report(intents, decisions, execution_results)
 
-        except Exception as e:
-            # DENY branch (no side effect, structured refusal, audit event)
-            return self._handle_deny(e)
+            if self.audit:
+                for event in audit_events:
+                    self.audit.write_event(event.get("stage", "unknown"), event)
 
-    async def _capture(self, raw_input: Any) -> Any:
-        raise NotImplementedError
+            return TurnResult(
+                success=True,
+                reply=reply,
+                intents=intents,
+                decisions=decisions,
+                execution_results=execution_results,
+                audit_events=audit_events,
+            )
 
-    async def _propose(self, utterance: Any, cancel_token: Any) -> Any:
-        raise NotImplementedError
+        except (Exception, asyncio.CancelledError) as e:
+            audit_events.append({"stage": "deny", "error": str(e)})
+            if self.audit:
+                for event in audit_events:
+                    self.audit.write_event(event.get("stage", "unknown"), event)
+            return TurnResult(
+                success=False,
+                reply=f"I was unable to complete that request. Reason: {e}",
+                intents=[],
+                decisions=[],
+                execution_results=[],
+                audit_events=audit_events,
+            )
 
-    async def _parse(self, raw_output: Any) -> list[IntentProposal]:
-        raise NotImplementedError
+    # Stage implementations
 
-    async def _decide(self, intents: list[IntentProposal]) -> PolicyDecision:
-        raise NotImplementedError
+    def _capture(self, raw_input: str) -> str:
+        return raw_input.strip()
 
-    async def _confirm(self, decision: PolicyDecision, cancel_token: Any) -> Any:
-        raise NotImplementedError
+    async def _propose(self, utterance: str, cancel_token: CancelToken) -> str:
+        specs = self.registry.get_all_specs()
+        prompt = self.prompt_builder.build(utterance, specs)
+        return await self.model.generate(prompt, cancel_token)
 
-    async def _grant(self, approved_decision: Any) -> GrantToken:
-        raise NotImplementedError
+    def _parse(self, raw_output: str) -> list[IntentProposal]:
+        try:
+            return self.parser.parse(raw_output)
+        except IntentParserError:
+            return []
 
-    async def _execute(self, grant: GrantToken, cancel_token: Any) -> Any:
-        raise NotImplementedError
+    def _decide(self, intent: IntentProposal, ctx: PolicyContext) -> PolicyDecision:
+        return self.policy_engine.decide(intent, ctx)
 
-    async def _report(self, result: Any) -> Any:
-        raise NotImplementedError
+    async def _confirm(
+        self,
+        intent: IntentProposal,
+        decision: PolicyDecision,
+        cancel_token: CancelToken,
+    ) -> bool:
+        cancel_token.raise_if_cancelled()
+        return await self.confirmation_broker.request_confirmation(intent, decision)
 
-    def _handle_deny(self, error: Exception) -> Any:
-        raise NotImplementedError
+    def _grant(
+        self,
+        intent: IntentProposal,
+        ctx: PolicyContext,
+        decision: PolicyDecision,
+    ) -> tuple[GrantToken, str]:
+        return self.policy_engine.issue_grant(intent, ctx, decision)
+
+    def _execute(
+        self,
+        intent: IntentProposal,
+        grant: GrantToken,
+        mac: str,
+    ) -> dict[str, Any]:
+        args_model = self.registry.get_spec(intent.capability).args_model
+        validated_args = args_model.model_validate(intent.args)
+        result: dict[str, Any] = self.executor.execute(grant, validated_args, mac)
+        return result
+
+    def _report(
+        self,
+        intents: list[IntentProposal],
+        decisions: list[PolicyDecision],
+        results: list[dict[str, Any]],
+    ) -> str:
+        parts: list[str] = []
+        for intent in intents:
+            matching = [
+                r for r in results
+                if r.get("status") == "success"
+            ]
+            if matching:
+                parts.append(f"Done: {intent.rationale}")
+            else:
+                parts.append(f"Could not execute: {intent.capability}")
+
+        return "; ".join(parts) if parts else "No actions were taken."
+
+    def _extract_reply(self, raw_output: str) -> str:
+        import json
+        try:
+            data = json.loads(raw_output)
+            if isinstance(data, dict):
+                return str(data.get("reply", "I'm not sure how to help with that."))
+        except (json.JSONDecodeError, ValueError):
+            pass
+        return "I'm not sure how to help with that."
