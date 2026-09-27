@@ -117,6 +117,8 @@ class VoiceLoop:
                     print(f"Speaking: {response_text}")
                     await self.tts.speak(response_text, cancel_token)
                 finally:
+                    # Give physical speakers 400ms to stop echoing into the mic
+                    await asyncio.sleep(0.4)
                     self.aec.mark_playback_active(False)
                     self.capture.clear()
                     

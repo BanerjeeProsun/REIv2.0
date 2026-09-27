@@ -232,15 +232,14 @@ class Orchestrator:
         results: list[dict[str, Any]],
     ) -> str:
         parts: list[str] = []
-        for intent in intents:
-            matching = [
-                r for r in results
-                if r.get("status") == "success"
-            ]
-            if matching:
-                parts.append(f"Done: {intent.rationale}")
+        for intent, decision in zip(intents, decisions):
+            if decision.verdict == Verdict.DENY:
+                reason = ", ".join(decision.reasons)
+                parts.append(f"Could not execute {intent.capability}: {reason}")
+            elif decision.verdict == Verdict.CONFIRM:
+                parts.append(f"Awaiting confirmation for {intent.capability}")
             else:
-                parts.append(f"Could not execute: {intent.capability}")
+                parts.append(f"Done: {intent.rationale}")
 
         return "; ".join(parts) if parts else "No actions were taken."
 

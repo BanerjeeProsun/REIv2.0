@@ -39,10 +39,12 @@ class PromptBuilder:
         )
 
     def _format_capabilities(self, specs: list[CapabilitySpec]) -> str:
+        import json
         lines: list[str] = []
         for spec in specs:
+            schema = spec.args_model.model_json_schema()
             lines.append(
                 f"- {spec.id} (v{spec.version}, tier={spec.tier.value}): "
-                f"{spec.summary}"
+                f"{spec.summary}\n  Args schema: {json.dumps(schema)}"
             )
         return "\n".join(lines)
