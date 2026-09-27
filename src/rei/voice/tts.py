@@ -11,7 +11,7 @@ class TTSError(Exception):
 class TextToSpeech:
     """Local Text-to-Speech (VOI-01, VOI-05)."""
 
-    def __init__(self, model_path: Path | None = None, voice: str = "af_heart", sample_rate: int = 24000) -> None:
+    def __init__(self, model_path: Path | None = None, voice: str = "af_maple", sample_rate: int = 24000) -> None:
         self.model_path = model_path
         self.voice = voice
         self.sample_rate = sample_rate
