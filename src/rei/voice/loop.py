@@ -1,6 +1,6 @@
 import asyncio
 import numpy as np
-from typing import Callable, Awaitable
+from typing import Callable
 
 from rei.voice.capture import AudioCapture
 from rei.voice.vad import VoiceActivityDetector
@@ -22,7 +22,7 @@ class VoiceLoop:
         vad: VoiceActivityDetector,
         stt: SpeechToText,
         aec: EchoCanceller,
-        on_utterance: Callable[[str], Awaitable[None]],
+        on_utterance: Callable[[str], None],
         on_volume: Callable[[float], None] = lambda v: None,
         on_transcribing: Callable[[], None] = lambda: None,
         on_discard: Callable[[], None] = lambda: None,
@@ -114,9 +114,10 @@ class VoiceLoop:
                 
             print(f"Heard: {text}")
             
-            # Hand off to the turn runner, which plans, replies and speaks
-            # (speech goes through the shared Speaker, which drives the AEC)
-            await self.on_utterance(text)
+            # Hand off without waiting: the turn runs in the background and the
+            # mic goes straight back to listening (e.g. for a spoken "yes").
+            # Rei's own speech is still ignored via the shared AEC.
+            self.on_utterance(text)
 
         except asyncio.CancelledError:
             print("Voice turn cancelled.")

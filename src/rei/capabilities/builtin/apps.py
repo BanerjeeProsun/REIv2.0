@@ -43,8 +43,11 @@ def apps_open_handler(args: OpenAppArgs) -> dict[str, str]:
         raise ValueError(f"App {args.app} not found in allowlist")
 
     try:
-        subprocess.Popen(path)
+        proc = subprocess.Popen(path)
         print(f"Launched: {path}")
+        # Let a following "type ..." in the same request target this app
+        from rei.capabilities.builtin import _win_input
+        _win_input.note_launch(proc.pid)
         return {"status": "success", "app": args.app}
     except Exception as e:
         raise ValueError(f"Failed to launch {args.app}: {e}")

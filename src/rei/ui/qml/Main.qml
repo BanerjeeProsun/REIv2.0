@@ -339,15 +339,73 @@ ApplicationWindow {
                 wrapMode: Text.Wrap
             }
 
+            // Voice answer hint: pulsing mic + what to say
+            RowLayout {
+                Layout.fillWidth: true
+                visible: confirmDialog.hint !== ""
+                spacing: 10
+                Rectangle {
+                    Layout.preferredWidth: 28
+                    Layout.preferredHeight: 28
+                    Layout.alignment: Qt.AlignVCenter
+                    radius: 14
+                    color: Theme.coralAlpha(0.16)
+                    Icon {
+                        anchors.centerIn: parent
+                        source: Qt.resolvedUrl("icons/mic.svg")
+                        size: 14
+                        color: Theme.coral
+                    }
+                    SequentialAnimation on opacity {
+                        running: confirmDialog.opened && confirmDialog.hint !== ""
+                        loops: Animation.Infinite
+                        NumberAnimation { to: 0.45; duration: 650; easing.type: Easing.InOutSine }
+                        NumberAnimation { to: 1.0; duration: 650; easing.type: Easing.InOutSine }
+                    }
+                }
+                Text {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignVCenter
+                    text: confirmDialog.hint
+                    color: Theme.textPrimary
+                    font.family: Theme.fontText
+                    font.pixelSize: Theme.sizeBodySm
+                    font.weight: Font.DemiBold
+                    wrapMode: Text.WordWrap
+                }
+            }
+
+            // Time left to answer
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 3
+                radius: 1.5
+                color: Qt.rgba(1, 1, 1, 0.06)
+                visible: confirmDialog.seconds > 0
+                Rectangle {
+                    height: parent.height
+                    radius: 1.5
+                    color: confirmDialog.strict ? Theme.coral : Theme.textSecondary
+                    width: parent.width * confirmDialog.remaining
+                }
+            }
+
             RowLayout {
                 Layout.fillWidth: true
                 Layout.topMargin: 8
                 spacing: 8
                 Item { Layout.fillWidth: true }
                 PillButton { text: "Deny"; variant: "ghost"; onClicked: confirmDialog.answer(false) }
-                PillButton { text: "Allow"; variant: "primary"; onClicked: confirmDialog.answer(true) }
+                PillButton { text: confirmDialog.strict ? "Confirm" : "Allow"; variant: "primary"; onClicked: confirmDialog.answer(true) }
             }
         }
+
+        property string hint: ""
+        property int seconds: 0
+        property bool strict: false
+        property real remaining: 1.0
+        NumberAnimation on remaining { id: countdownAnim; running: false; from: 1.0; to: 0.0 }
+        onClosed: { countdownAnim.stop(); hint = ""; seconds = 0 }
     }
 
     Connections {
@@ -356,7 +414,20 @@ ApplicationWindow {
             confirmTitle.text = title
             confirmMsg.text = msg
             confirmDialog.intentId = intent_id
+            confirmDialog.hint = ""
+            confirmDialog.seconds = 0
             confirmDialog.open()
+        }
+        function onConfirmationHint(hint, seconds, strict) {
+            confirmDialog.hint = hint
+            confirmDialog.strict = strict
+            confirmDialog.seconds = seconds
+            countdownAnim.duration = seconds * 1000
+            countdownAnim.restart()
+        }
+        function onConfirmationClosed(intent_id) {
+            // Answered by voice or timed out: close without sending a response
+            if (confirmDialog.opened && confirmDialog.intentId === intent_id) confirmDialog.close()
         }
     }
 }

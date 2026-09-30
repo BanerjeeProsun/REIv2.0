@@ -11,6 +11,8 @@ class ReiBackend(QObject):
     stateChanged = Signal()
     messageAdded = Signal(str, bool)
     confirmationRequested = Signal(str, str, str) # title, message, intent_id
+    confirmationHint = Signal(str, int, bool)     # spoken-answer hint, seconds to answer, strict
+    confirmationClosed = Signal(str)              # intent_id answered/expired (close the popup)
     textMessageReceived = Signal(str)
 
     def __init__(self):

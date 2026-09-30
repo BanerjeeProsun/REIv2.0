@@ -40,7 +40,8 @@ for _stream in (sys.stdout, sys.stderr):
     if _stream is not None and hasattr(_stream, "reconfigure"):
         _stream.reconfigure(encoding="utf-8", errors="replace")
 
-def create_orchestrator(ui: 'ReiUI', registry: Any, store: Any, policy_config_model: Any, grant_key: bytes) -> Orchestrator:
+def create_orchestrator(ui: 'ReiUI', registry: Any, store: Any, policy_config_model: Any, grant_key: bytes,
+                        ui_client: Any) -> Orchestrator:
     policy_config = policy_config_model.model_dump()
     policy_engine = PolicyEngine(registry, policy_config, grant_key)
 
@@ -70,21 +71,21 @@ def create_orchestrator(ui: 'ReiUI', registry: Any, store: Any, policy_config_mo
 
     active_model = ModelRouter(cloud_model=cloud_model, local_model=local_model)
 
-    from rei.confirm.broker import ConfirmationBroker, UIClientWired
+    from rei.confirm.broker import ConfirmationBroker
     orchestrator = Orchestrator(
         model=active_model,
         registry=registry,
         policy_engine=policy_engine,
         parser=IntentParser(),
         prompt_builder=PromptBuilder(store=store),
-        confirmation_broker=ConfirmationBroker(UIClientWired(ui.backend)),
+        confirmation_broker=ConfirmationBroker(ui_client),
         executor=Executor(registry, GrantVerifier(registry, grant_key)),
     )
     orchestrator.egress_gate = egress_gate  # type: ignore[attr-defined]
     return orchestrator
 
 
-async def start_voice_loop(ui: 'ReiUI', aec: EchoCanceller, run_turn: Any) -> None:
+async def start_voice_loop(ui: 'ReiUI', aec: EchoCanceller, route_input: Any, busy: Any) -> None:
     try:
         capture = AudioCapture()
         vad = VoiceActivityDetector(threshold=3)
@@ -96,18 +97,22 @@ async def start_voice_loop(ui: 'ReiUI', aec: EchoCanceller, run_turn: Any) -> No
         ui.set_status(f"Voice Error: {e}")
         return
 
-    def on_utterance(text: str) -> Awaitable[None]:
-        return run_turn(text, Origin.USER_VOICE)  # type: ignore[no-any-return]
+    def on_utterance(text: str) -> None:
+        # Non-blocking: the mic keeps listening while the turn runs, so a
+        # spoken "yes" can answer a confirmation mid-turn
+        route_input(text, Origin.USER_VOICE)
 
+    # Only touch the UI state when no turn owns it (a turn may be speaking/listening)
     loop = VoiceLoop(
         capture, vad, stt, aec,
         on_utterance=on_utterance,
         on_volume=ui.update_volume,
-        on_transcribing=lambda: ui.set_state("processing"),
-        on_discard=ui.set_rest_state,
+        on_transcribing=lambda: None if busy() else ui.set_state("processing"),
+        on_discard=lambda: None if busy() else ui.set_rest_state(),
     )
     ui.mic_active = True
-    ui.set_rest_state()
+    if not busy():  # a turn (e.g. the greeting) may already own the UI state
+        ui.set_rest_state()
     try:
         await loop.start()
     except asyncio.CancelledError:
@@ -146,8 +151,6 @@ def main() -> None:
     ui.set_context(store, registry, policy_config_model.model_dump())
     ui.show()
 
-    orchestrator = create_orchestrator(ui, registry, store, policy_config_model, grant_key)
-
     # Initialize TTS
     try:
         from rei.models.loader import ModelLoader
@@ -164,6 +167,37 @@ def main() -> None:
     aec = EchoCanceller()
     speaker = Speaker(tts, aec, on_level=ui.update_output_level)
 
+    # Voice (or click) confirmation: Rei reads the action back and listens
+    from rei.confirm.broker import UIClientWired
+    from rei.confirm.voice import VoiceConfirmer
+    confirmer = VoiceConfirmer()
+
+    def describe(intent: Any) -> str:
+        try:
+            phrase = registry.get_spec(intent.capability).confirm_template.format(**intent.args)
+        except Exception:
+            phrase = intent.capability
+        return phrase if len(phrase) <= 140 else phrase[:137] + "..."
+
+    def on_listen(listening: bool) -> None:
+        if listening:
+            ui.set_state("listening", 'Say "confirm" or "no"...' if confirmer.strict else 'Say "yes" or "no"...')
+        else:
+            ui.set_state("processing")
+
+    defaults = policy_config_model.defaults
+    ui_client = UIClientWired(
+        ui.backend,
+        confirmer=confirmer,
+        say=lambda text: speaker.say(text, on_start=lambda: ui.set_state("speaking")),
+        describe=describe,
+        mic_active=lambda: ui.mic_active,
+        on_listen=on_listen,
+        voice_window_s=float(defaults.voice_confirm_window_s),
+        click_window_s=float(defaults.confirm_timeout_s),
+    )
+    orchestrator = create_orchestrator(ui, registry, store, policy_config_model, grant_key, ui_client)
+
     def get_current_privacy_mode() -> PrivacyMode:
         return PrivacyMode.CLOUD_ASSISTED if ui.backend.privacyModeText == "Cloud Assisted" else PrivacyMode.LOCAL_ONLY
 
@@ -175,7 +209,25 @@ def main() -> None:
         background_tasks.add(task)
         task.add_done_callback(background_tasks.discard)
 
-    async def run_turn(text: str, origin: Origin, *, show_user: bool = True) -> None:
+    active_turns = {"n": 0}
+
+    def busy() -> bool:
+        return active_turns["n"] > 0 or confirmer.pending
+
+    def route_input(text: str, origin: Origin) -> None:
+        """Every utterance or typed message enters here. While Rei is waiting
+        for a confirmation, the input answers it instead of starting a turn."""
+        text = text.strip()
+        if not text:
+            return
+        if confirmer.pending:
+            if confirmer.offer(text):
+                ui.add_message(text, True)
+            # Anything else is ignored until the question is answered or expires
+            return
+        spawn(run_turn(text, origin))
+
+    async def run_turn(text: str, origin: Origin, *, show_user: bool = True, allow_actions: bool = True) -> None:
         """The single path for voice, typed and greeting turns:
         processing -> reply in chat -> speaking -> rest state, always."""
         text = text.strip()
@@ -185,6 +237,7 @@ def main() -> None:
         speaker.stop()
         if show_user:
             ui.add_message(text, True)
+        active_turns["n"] += 1
         async with turn_lock:
             ui.set_state("processing")
             try:
@@ -197,7 +250,7 @@ def main() -> None:
                     settings={},
                     recent=None,
                 )
-                result = await orchestrator.process_turn(text, ctx, CancelToken())
+                result = await orchestrator.process_turn(text, ctx, CancelToken(), allow_actions=allow_actions)
                 ui.add_message(result.reply, False)
                 await speaker.say(result.reply, on_start=lambda: ui.set_state("speaking"))
             except asyncio.CancelledError:
@@ -206,6 +259,7 @@ def main() -> None:
                 print(f"Turn failed: {e}")
                 ui.add_message("Sorry, something went wrong while handling that.", False)
             finally:
+                active_turns["n"] -= 1
                 ui.set_rest_state()
 
     def on_setup(name: str, purpose: str) -> None:
@@ -235,12 +289,14 @@ def main() -> None:
 
         # Personalised greeting through the full pipeline. In Cloud Assisted
         # mode the name leaves the device only as [USER_NAME] and is restored
-        # locally before it is shown and spoken.
+        # locally before it is shown and spoken. It is purely conversational:
+        # no capabilities are offered, so it can never type or run anything.
         spawn(run_turn(
             f"Greet me warmly by name in one or two sentences. "
             f"My name is {name}; I mainly use you for {purpose}.",
             Origin.USER_TYPED,
             show_user=False,
+            allow_actions=False,
         ))
 
     ui.backend.onboardingCompleted.connect(on_setup)
@@ -259,12 +315,13 @@ def main() -> None:
     orchestrator.egress_gate.current_mode = get_current_privacy_mode()  # type: ignore[attr-defined]
 
     def on_text_message(text: str) -> None:
-        spawn(run_turn(text, Origin.USER_TYPED))
+        # Typing "yes" also answers a pending confirmation
+        route_input(text, Origin.USER_TYPED)
 
     ui.backend.textMessageReceived.connect(on_text_message)
 
     # Start voice loop in background
-    voice_task = loop.create_task(start_voice_loop(ui, aec, run_turn))
+    voice_task = loop.create_task(start_voice_loop(ui, aec, route_input, busy))
     app.aboutToQuit.connect(voice_task.cancel)
 
     with loop:

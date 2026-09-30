@@ -16,6 +16,8 @@ from rei.models.router import ModelRouter, Route
 from rei.models.formatter import FormatterError
 from rei.egress.anonymizer import Anonymizer, Vault
 from rei.capabilities.registry import CapabilityRegistry
+from rei.content.guard import ContentGuard
+from rei.content.envelope import TaintType
 from rei.confirm.broker import ConfirmationBroker
 from rei.core.executor import Executor
 from rei.audit.writer import AuditLogWriter
@@ -68,7 +70,11 @@ class Orchestrator:
         raw_input: str,
         ctx: PolicyContext,
         cancel_token: CancelToken,
+        allow_actions: bool = True,
     ) -> TurnResult:
+        """Run one turn. allow_actions=False makes it purely conversational
+        (e.g. the setup greeting): no capabilities are offered to the model and
+        any intents it still proposes are discarded."""
         audit_events: list[dict[str, Any]] = []
         try:
             # 1. Capture
@@ -77,11 +83,12 @@ class Orchestrator:
 
             # 2. Propose
             cancel_token.raise_if_cancelled()
-            raw_output, vault = await self._propose(utterance, ctx, cancel_token, audit_events)
+            specs = self.registry.get_all_specs() if allow_actions else []
+            raw_output, vault = await self._propose(utterance, ctx, cancel_token, audit_events, specs)
             audit_events.append({"stage": "propose", "output_len": len(raw_output)})
 
             # 3. Parse
-            intents = self._parse(raw_output)
+            intents = self._parse(raw_output) if allow_actions else []
             if self._planned_by_small_model(vault):
                 grounded = self._ground_intents(intents, utterance)
                 if len(grounded) != len(intents):
@@ -122,6 +129,9 @@ class Orchestrator:
 
             decisions: list[PolicyDecision] = []
             execution_results: list[dict[str, Any]] = []
+            # One outcome per intent, so the report can never pair an intent
+            # with another intent's result (e.g. after a declined confirmation)
+            outcomes: list[tuple[IntentProposal, str, dict[str, Any] | None]] = []
 
             for intent in intents:
                 cancel_token.raise_if_cancelled()
@@ -137,6 +147,7 @@ class Orchestrator:
                 })
 
                 if decision.verdict == Verdict.DENY:
+                    outcomes.append((intent, "denied", {"reasons": decision.reasons}))
                     continue
 
                 # 5. Confirm
@@ -148,6 +159,7 @@ class Orchestrator:
                         "approved": approved,
                     })
                     if not approved:
+                        outcomes.append((intent, "declined", None))
                         continue
 
                 # 6. Grant
@@ -158,17 +170,36 @@ class Orchestrator:
                     "capability": intent.capability,
                 })
 
-                # 7. Execute
-                result = self._execute(intent, grant, mac)
+                # 7. Execute (off the UI thread; a failing handler fails only its intent)
+                result = await self._execute(intent, grant, mac)
                 execution_results.append(result)
+                outcomes.append((intent, "executed", result))
                 audit_events.append({
                     "stage": "execute",
                     "capability": intent.capability,
                     "status": result.get("status", "unknown"),
                 })
+                # Content read from outside (e.g. an email) taints the rest of the turn
+                taint = result.get("taint")
+                if isinstance(taint, str) and taint in TaintType.__members__:
+                    ctx = ContentGuard().propagate_taint(ctx, [TaintType(taint)])
 
-            # 8. Report
-            reply = self._report(intents, decisions, execution_results)
+            # 8. Report: speak real results when a capability returned content
+            content_results = [
+                (i, r) for i, status, r in outcomes
+                if status == "executed" and r is not None and isinstance(r.get("content"), str)
+            ]
+            if content_results:
+                reply = await self._summarize_results(utterance, content_results, cancel_token)
+                audit_events.append({"stage": "summarize", "sources": [i.capability for i, _ in content_results]})
+                # Mention anything else that didn't go through
+                rest = [o for o in outcomes if o[1] != "executed"]
+                if rest:
+                    reply = f"{reply} {self._report(rest)}"
+            else:
+                reply = self._report(outcomes)
+            if vault is not None:
+                reply = vault.rehydrate(reply)
             self._write_audit(audit_events)
 
             return TurnResult(
@@ -208,6 +239,7 @@ class Orchestrator:
         ctx: PolicyContext,
         cancel_token: CancelToken,
         audit_events: list[dict[str, Any]],
+        specs: list[Any],
     ) -> tuple[str, Vault | None]:
         """Local Formatter -> Cloud Planner.
 
@@ -216,7 +248,6 @@ class Orchestrator:
         placeholder vault stays on-device so the reply can be rehydrated.
         If the formatter fails, fail closed and plan locally.
         """
-        specs = self.registry.get_all_specs()
         router = self.model if isinstance(self.model, ModelRouter) else None
 
         if router is None:
@@ -272,10 +303,11 @@ class Orchestrator:
             return await plan_locally()
 
     # Words too generic to show the user asked for a specific capability
+    # ("type"/"writing" stay meaningful: they're how people ask to type text)
     _GROUNDING_STOPWORDS = frozenset({
         "the", "and", "for", "set", "using", "useful", "piece", "information",
         "long", "term", "system", "apps", "application", "media", "web",
-        "writing", "messages", "documents", "text", "type", "keyboard", "browser",
+        "messages", "documents", "text", "keyboard", "browser",
     })
 
     def _planned_by_small_model(self, vault: Vault | None) -> bool:
@@ -357,7 +389,7 @@ class Orchestrator:
     ) -> tuple[GrantToken, str]:
         return self.policy_engine.issue_grant(intent, ctx, decision)
 
-    def _execute(
+    async def _execute(
         self,
         intent: IntentProposal,
         grant: GrantToken,
@@ -365,32 +397,83 @@ class Orchestrator:
     ) -> dict[str, Any]:
         args_model = self.registry.get_spec(intent.capability).args_model
         validated_args = args_model.model_validate(intent.args)
-        result: dict[str, Any] = self.executor.execute(grant, validated_args, mac)
+        try:
+            # Handlers may block (typing, network, launching apps): keep the UI responsive
+            result: dict[str, Any] = await asyncio.to_thread(self.executor.execute, grant, validated_args, mac)
+        except Exception as e:
+            print(f"[Orchestrator] {intent.capability} failed: {e}")
+            return {"status": "error", "error": str(e)}
         return result
+
+    def _describe(self, intent: IntentProposal) -> str:
+        """Human phrase for an intent, from its own confirm template (not the
+        model's rationale, which small models often get wrong)."""
+        try:
+            spec = self.registry.get_spec(intent.capability)
+            return spec.confirm_template.format(**intent.args)
+        except Exception:
+            return intent.capability
 
     def _report(
         self,
-        intents: list[IntentProposal],
-        decisions: list[PolicyDecision],
-        results: list[dict[str, Any]],
+        outcomes: list[tuple[IntentProposal, str, dict[str, Any] | None]],
     ) -> str:
         parts: list[str] = []
-        result_iter = iter(results)
-        for intent, decision in zip(intents, decisions):
-            if decision.verdict == Verdict.DENY:
-                reason = ", ".join(decision.reasons)
-                parts.append(f"Could not execute {intent.capability}: {reason}")
+        for intent, status, result in outcomes:
+            what = self._describe(intent).rstrip(" .!?")
+            if status == "denied":
+                reasons = ", ".join((result or {}).get("reasons", [])) or "policy"
+                parts.append(f"I'm not allowed to do that ({what}): {reasons}.")
+            elif status == "declined":
+                parts.append(f"Okay, cancelled: {what}.")
+            elif result and result.get("status") == "success":
+                parts.append(f"Done: {what}.")
             else:
-                # Intent was either ALLOW or CONFIRM (and approved) — check execution result
-                result = next(result_iter, None)
-                if result and result.get("status") == "success":
-                    parts.append(f"Done: {intent.rationale}")
-                elif result:
-                    parts.append(f"Failed: {intent.capability}")
-                else:
-                    parts.append(f"Skipped: {intent.capability}")
+                error = (result or {}).get("error", "unknown error")
+                parts.append(f"That didn't work ({what}): {error}.")
+        return " ".join(parts) if parts else "No actions were taken."
 
-        return "; ".join(parts) if parts else "No actions were taken."
+    RESULTS_SCHEMA: dict[str, Any] = {
+        "type": "object",
+        "properties": {"reply": {"type": "string"}},
+        "required": ["reply"],
+    }
+
+    async def _summarize_results(
+        self,
+        utterance: str,
+        results: list[tuple[IntentProposal, dict[str, Any]]],
+        cancel_token: CancelToken,
+    ) -> str:
+        """Answer the user from capability results (e.g. emails that were read).
+
+        The results are untrusted: they are sanitised and fenced in
+        UNTRUSTED_CONTENT envelopes, and this call offers NO capabilities, so
+        instructions hidden in the content can never trigger an action. It runs
+        on the local model, so the content never leaves the device.
+        """
+        guard = ContentGuard()
+        blocks = []
+        for intent, result in results:
+            taint = result.get("taint")
+            if not (isinstance(taint, str) and taint in TaintType.__members__):
+                taint = "DOCUMENT"
+            envelope = guard.encapsulate(str(result["content"])[:6000], intent.capability, TaintType(taint))
+            blocks.append(envelope.format_for_model())
+        prompt = self.prompt_builder.build_results_prompt(utterance, blocks)
+
+        router = self.model if isinstance(self.model, ModelRouter) else None
+        try:
+            if router is not None and router.local_model is not None:
+                raw = await router.generate_local(prompt, cancel_token, schema=self.RESULTS_SCHEMA)
+            else:
+                raw = await self.model.generate(prompt, cancel_token)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            print(f"[Orchestrator] results summary failed: {e}")
+            return "I got the results but couldn't summarise them."
+        return self._extract_reply(raw)
 
     FALLBACK_REPLY = "I'm not sure how to help with that."
     REPLY_KEYS = ("reply", "response", "message", "text", "answer")
