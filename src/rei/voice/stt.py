@@ -25,10 +25,16 @@ class STTError(Exception):
 class SpeechToText:
     """Local Speech-to-Text using faster-whisper (VOI-01)."""
 
-    def __init__(self, model_size: str = "base") -> None:
+    def __init__(self, model_size: str = "base", language: str | None = "en") -> None:
+        # Rei's TTS and planner are English-only. Auto-detection often mistakes
+        # accented English for another language and returns non-Latin script.
+        self.language = language
+        # local_files_only: load from the Hugging Face cache without contacting
+        # the hub. Rei's socket guard blocks that egress, which made both the
+        # GPU and CPU loads fail at startup.
         try:
             print("Loading Whisper on GPU (CUDA)...")
-            self.model = WhisperModel(model_size, device="cuda", compute_type="float16")
+            self.model = WhisperModel(model_size, device="cuda", compute_type="float16", local_files_only=True)
             # Pre-warm the model
             dummy_audio = np.zeros(16000, dtype=np.float32)
             self.model.transcribe(dummy_audio, beam_size=1)
@@ -36,7 +42,7 @@ class SpeechToText:
         except Exception as e:
             print(f"GPU fallback triggered: {e}. Falling back to CPU...")
             try:
-                self.model = WhisperModel(model_size, device="cpu", compute_type="int8")
+                self.model = WhisperModel(model_size, device="cpu", compute_type="int8", local_files_only=True)
                 # Pre-warm the model
                 dummy_audio = np.zeros(16000, dtype=np.float32)
                 self.model.transcribe(dummy_audio, beam_size=1)
@@ -52,7 +58,7 @@ class SpeechToText:
         loop = asyncio.get_running_loop()
         
         def _transcribe_sync() -> str:
-            segments, _ = self.model.transcribe(audio, beam_size=5)
+            segments, _ = self.model.transcribe(audio, beam_size=5, language=self.language)
             text = "".join(segment.text for segment in segments)
             return text.strip()
 

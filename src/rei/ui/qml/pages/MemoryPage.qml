@@ -1,135 +1,85 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
+import ".."
+import "../components"
 
-Item {
-    id: root
+PageScaffold {
+    id: page
+    title: "Memory"
+    subtitle: "What Rei remembers about you, encrypted on this device."
 
-    readonly property color colorCarbonSurface: "#141516"
-    readonly property color colorAshBorder: "#34343a"
-    readonly property color colorSteelText: "#62666d"
-    readonly property color colorMistText: "#d0d6e0"
-    readonly property color colorSnow: "#f7f8f8"
-    readonly property color colorFogText: "#8a8f98"
-    readonly property string fontInter: "Inter Variable"
-    readonly property string fontMono: "Berkeley Mono"
+    // Called by Main.qml whenever this page becomes visible
+    function activated() { if (typeof memoryModel !== "undefined") memoryModel.refresh() }
 
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 48
-        spacing: 24
+    actions: PillButton {
+        text: "Refresh"
+        iconSource: Qt.resolvedUrl("../icons/refresh.svg")
+        small: true
+        onClicked: page.activated()
+    }
 
-        // PAGE HEADER
-        RowLayout {
+    // Empty state
+    SurfaceCard {
+        visible: memoryRepeater.count === 0
+        padding: 40
+        ColumnLayout {
             Layout.fillWidth: true
-            
+            spacing: 8
+            Icon {
+                Layout.alignment: Qt.AlignHCenter
+                source: Qt.resolvedUrl("../icons/memory.svg")
+                size: 28
+                color: Theme.textMuted
+            }
             Text {
-                text: "Memory Ledger"
-                color: colorSnow
-                font.family: fontInter
-                font.pixelSize: 32
-                font.weight: 510
-font.letterSpacing: -0.416
+                Layout.fillWidth: true
+                Layout.topMargin: 8
+                horizontalAlignment: Text.AlignHCenter
+                text: "No memories yet"
+                color: Theme.textPrimary
+                font.family: Theme.fontDisplay
+                font.pixelSize: Theme.sizeSubheading
+                font.weight: Font.DemiBold
             }
-            
-            Item { Layout.fillWidth: true }
-            
-            // Sync / Refresh
-            Rectangle {
-                width: 32; height: 32; radius: 16
-                color: "transparent"
-                border.color: colorAshBorder; border.width: 1
-                Image {
-                    source: "../icons/refresh.svg"
-                    sourceSize.width: 14; sourceSize.height: 14
-                    anchors.centerIn: parent
-                }
-                MouseArea {
-                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                    onClicked: memoryModel.refresh()
-                }
+            Text {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                text: "Ask Rei to remember something and it will appear here."
+                color: Theme.textSecondary
+                font.family: Theme.fontText
+                font.pixelSize: Theme.sizeBodySm
+                wrapMode: Text.WordWrap
             }
         }
+    }
 
-        Rectangle {
-            Layout.fillWidth: true; height: 1; color: colorAshBorder
-        }
-
-        // CONTENT
-        StackLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            currentIndex: memoryModel.rowCount() === 0 ? 0 : 1
-
-            // Empty State
-            Item {
-                ColumnLayout {
-                    anchors.centerIn: parent
-                    spacing: 8
-                    Text { text: "No memories yet."; color: colorMistText; font.family: fontInter; font.pixelSize: 15; Layout.alignment: Qt.AlignHCenter }
-                    Text { text: "Rei builds context as you interact."; color: colorSteelText; font.family: fontInter; font.pixelSize: 14; Layout.alignment: Qt.AlignHCenter }
+    Repeater {
+        id: memoryRepeater
+        model: typeof memoryModel !== "undefined" ? memoryModel : 0
+        SurfaceCard {
+            hoverable: true
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.s8
+                Tag { text: model.kind }
+                Tag { text: model.dataClass; ink: Theme.textMuted }
+                Item { Layout.fillWidth: true }
+                Text {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: model.createdAt
+                    color: Theme.textMuted
+                    font.family: Theme.fontText
+                    font.pixelSize: Theme.sizeCaption
                 }
             }
-
-            // Memory List
-            ListView {
-                id: memoryList
-                model: memoryModel
-                spacing: 16
-                clip: true
-                
-                delegate: Rectangle {
-                    width: memoryList.width
-                    height: contentCol.implicitHeight + 32
-                    radius: 8
-                    color: colorCarbonSurface
-                    border.color: colorAshBorder
-                    border.width: 1
-
-                    ColumnLayout {
-                        id: contentCol
-                        anchors.fill: parent
-                        anchors.margins: 16
-                        spacing: 8
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-
-                            Rectangle {
-                                width: 8; height: 8; radius: 4
-                                color: dataClass === "C0" ? "#e4e5e9" : "#62666d"
-                            }
-
-                            Text {
-                                text: kind
-                                color: colorSnow
-                                font.family: fontMono
-                                font.pixelSize: 15
-                                font.weight: 590
-                            }
-                            
-                            Item { Layout.fillWidth: true }
-                            
-                            Text {
-                                text: createdAt
-                                color: colorSteelText
-                                font.family: fontInter
-                                font.pixelSize: 13
-                            }
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: content
-                            color: colorMistText
-                            font.family: fontInter
-                            font.pixelSize: 15
-                            lineHeight: 1.5
-                            wrapMode: Text.Wrap
-                        }
-                    }
-                }
+            Text {
+                Layout.fillWidth: true
+                text: model.content
+                color: Theme.textBody
+                font.family: Theme.fontText
+                font.pixelSize: Theme.sizeBody
+                lineHeight: 1.4
+                wrapMode: Text.Wrap
             }
         }
     }

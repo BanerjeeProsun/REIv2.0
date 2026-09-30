@@ -1,5 +1,5 @@
 import hashlib
-from typing import Any
+from typing import Any, Callable
 from dataclasses import dataclass
 from rei.policy.schemas import PrivacyMode
 from rei.capabilities.spec import DataClass
@@ -20,17 +20,42 @@ class EgressRequest:
     turn_id: str
     consent_ref: str | None = None
 
+# Modes in which user-approved connector hosts may be contacted
+CONNECTOR_MODES = (PrivacyMode.LOCAL_PLUS_WEB, PrivacyMode.CLOUD_ASSISTED)
+
+
 class EgressGate:
-    def __init__(self, config: PolicyConfig, current_mode: PrivacyMode) -> None:
+    def __init__(
+        self,
+        config: PolicyConfig,
+        current_mode: PrivacyMode,
+        connector_hosts: Callable[[], set[str]] = lambda: set(),
+    ) -> None:
         self.config = config
         self.current_mode = current_mode
         self.redactor = Redactor(mask_pii=True)
+        # Hosts of connectors the user has connected (e.g. imap.gmail.com)
+        self.connector_hosts = connector_hosts
 
     def _assert_mode_allows(self, req: EgressRequest) -> None:
         if self.current_mode == PrivacyMode.LOCAL_ONLY:
             raise EgressBlockedError("Egress blocked in LOCAL_ONLY mode")
 
+    def _is_connector_host(self, destination: str) -> bool:
+        """Exact match, or a suffix entry starting with "." (e.g. ".googlevideo.com"
+        for YouTube's per-stream hosts like rr3---sn-abc.googlevideo.com)."""
+        host = destination.lower().rstrip(".")
+        for entry in self.connector_hosts():
+            entry = entry.lower()
+            if host == entry or (entry.startswith(".") and host.endswith(entry)):
+                return True
+        return False
+
     def _assert_host_allowlisted(self, destination: str) -> None:
+        if self._is_connector_host(destination):
+            if self.current_mode not in CONNECTOR_MODES:
+                raise EgressBlockedError(f"Host {destination} not allowed in mode {self.current_mode.value}")
+            return
         hosts = self.config.egress.get("hosts", {})
         if destination not in hosts:
             raise EgressBlockedError(f"Host {destination} not in egress allowlist")
@@ -41,6 +66,17 @@ class EgressGate:
     def _require_valid_consent(self, consent_ref: str | None) -> None:
         if not consent_ref: # simplified consent check
             raise EgressBlockedError("Missing valid consent for C2 data")
+
+    def check_host(self, destination: str, purpose: str) -> None:
+        """Gate a direct connection (IMAP/SMTP, streaming) made by an egress module.
+
+        Raises EgressBlockedError unless the current mode allows network access
+        and the host is allowlisted (policy.toml or a connected connector).
+        """
+        req = EgressRequest(destination=destination, purpose=purpose, payload=[], turn_id="system")
+        self._assert_mode_allows(req)
+        self._assert_host_allowlisted(destination)
+        print(f"Ledger record: Connection to {destination} for {purpose}.")
 
     async def send(self, req: EgressRequest) -> Any:
         self._assert_mode_allows(req)

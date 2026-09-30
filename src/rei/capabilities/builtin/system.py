@@ -88,8 +88,15 @@ system_type_text_spec = CapabilitySpec(
 )
 
 def system_type_text_handler(args: TypeTextArgs) -> dict[str, str]:
-    import pyautogui
-    import time
-    time.sleep(0.5) # Give OS a moment if app was just launched
-    pyautogui.write(args.text, interval=0.01)
+    from rei.capabilities.builtin import _win_input as win
+
+    # Type into the user's window, never Rei's own: the app opened earlier in
+    # this request if there is one, else the window used before Rei.
+    hwnd = win.target_window(prefer_pid=win.recent_launch_pid())
+    if hwnd is None:
+        raise RuntimeError("No window to type into. Open or click the app first.")
+    if not win.focus(hwnd):
+        raise RuntimeError("Windows didn't let me focus that window.")
+    win.wait_responsive(hwnd)  # a just-launched app may still be starting up
+    win.insert_text(args.text)
     return {"status": "success", "text_typed": args.text}

@@ -1,162 +1,294 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "components"
 
 ApplicationWindow {
     id: window
     visible: true
-    width: 1080
-    height: 800
+    width: 1180
+    height: 780
+    minimumWidth: 880
+    minimumHeight: 600
     title: "Rei"
-    color: "#08090a" // Onyx Canvas
-    
-    // Theme Colors
-    readonly property color colorOnyxCanvas: "#08090a"
-    readonly property color colorCarbonSurface: "#141516"
-    readonly property color colorGraphiteSurface: "#1c1c1f"
-    readonly property color colorSmokeSurface: "#23252a"
-    readonly property color colorIronSurface: "#2d2e31"
-    readonly property color colorAshBorder: "#34343a"
-    readonly property color colorFerriteBorder: "#3e3e44"
-    readonly property color colorSteelText: "#62666d"
-    readonly property color colorPewterText: "#7f7f80"
-    readonly property color colorFogText: "#8a8f98"
-    readonly property color colorMistText: "#d0d6e0"
-    readonly property color colorChalkBorder: "#e4e5e9"
-    readonly property color colorSnow: "#f7f8f8"
+    color: Theme.canvas
 
-    // Typography
-    readonly property string fontInter: "Inter Variable"
-    readonly property string fontMono: "Berkeley Mono"
+    property int currentPage: 0
 
-    ColumnLayout {
+    readonly property var pages: [
+        { name: "Chat",         icon: "icons/chat.svg",         source: "pages/HomePage.qml" },
+        { name: "Activity",     icon: "icons/activity.svg",     source: "pages/ActivityPage.qml" },
+        { name: "Memory",       icon: "icons/memory.svg",       source: "pages/MemoryPage.qml" },
+        { name: "Capabilities", icon: "icons/capabilities.svg", source: "pages/CapabilitiesPage.qml" },
+        { name: "Connectors",   icon: "icons/connectors.svg",   source: "pages/ConnectorsPage.qml" },
+        { name: "Settings",     icon: "icons/settings.svg",     source: "pages/SettingsPage.qml" }
+    ]
+
+    // Ctrl+1..5 jumps between pages
+    Instantiator {
+        model: window.pages.length
+        delegate: Shortcut {
+            sequence: "Ctrl+" + (index + 1)
+            onActivated: window.currentPage = index
+        }
+    }
+
+    RowLayout {
         anchors.fill: parent
         spacing: 0
 
-        // TOP NAVIGATION BAR
+        // SIDEBAR
         Rectangle {
-            Layout.fillWidth: true
-            height: 56
-            color: colorOnyxCanvas
-            
-            Rectangle {
-                anchors.bottom: parent.bottom
-                width: parent.width
-                height: 1
-                color: colorSmokeSurface
-            }
+            Layout.preferredWidth: Theme.sidebarWidth
+            Layout.fillHeight: true
+            color: Theme.recessed
 
-            RowLayout {
+            ColumnLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 24
-                anchors.rightMargin: 24
-                spacing: 24
+                anchors.topMargin: 28
+                anchors.bottomMargin: 20
+                anchors.leftMargin: 16
+                anchors.rightMargin: 16
+                spacing: 4
 
-                // Logo Area
+                // Brand: aligned to the same 16px inset as the nav icons
                 RowLayout {
-                    spacing: 8
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 16
+                    Layout.bottomMargin: 28
+                    spacing: 12
                     Rectangle {
-                        width: 16; height: 16; radius: 8
+                        Layout.preferredWidth: 18
+                        Layout.preferredHeight: 18
+                        Layout.alignment: Qt.AlignVCenter
+                        radius: 9
                         color: "transparent"
-                        border.color: colorSnow; border.width: 2
+                        border.color: Theme.coral
+                        border.width: 2
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 6; height: 6; radius: 3
+                            color: Theme.coral
+                            opacity: backend.state === "listening" || backend.state === "speaking" ? 1 : 0.35
+                            Behavior on opacity { NumberAnimation { duration: Theme.page } }
+                        }
                     }
                     Text {
+                        Layout.alignment: Qt.AlignVCenter
                         text: "Rei"
-                        color: colorSnow
-                        font.family: fontInter
-                        font.pixelSize: 15
-                        font.weight: 590
-font.letterSpacing: -0.15
+                        color: Theme.textPrimary
+                        font.family: Theme.fontDisplay
+                        font.pixelSize: 20
+                        font.weight: Font.DemiBold
+                        font.letterSpacing: Theme.tracking(20)
                     }
                 }
 
-                // Nav Links
-                RowLayout {
-                    spacing: 24
-                    Layout.fillHeight: true
-                    Repeater {
-                        model: [
-                            {name: "Chat", icon: "chat.svg"},
-                            {name: "Activity", icon: "activity.svg"},
-                            {name: "Memory", icon: "memory.svg"},
-                            {name: "Capabilities", icon: "capabilities.svg"},
-                            {name: "Settings", icon: "settings.svg"}
-                        ]
-                        RowLayout {
-                            spacing: 8
-                            Layout.alignment: Qt.AlignVCenter
-                            
-                            Image {
-                                source: "icons/" + modelData.icon
-                                sourceSize.width: 16
-                                sourceSize.height: 16
-                                Layout.preferredWidth: 16
-                                Layout.preferredHeight: 16
-                                // Use a simple ColorOverlay if available, but since we don't have it reliably:
-                                // To make stroke colors right, we can load a raw SVG or use SVG color properties,
-                                // but standard Image won't colorize easily. Actually, standard SVG strokes might just render black if not modified.
-                                // Let's just assume we used currentColor, which in QML might default to black.
-                                // We can use IconImage, but let's just keep the text colored.
-                            }
-
-                            Text {
-                                text: modelData.name
-                                color: stackView.currentIndex === index ? colorSnow : colorFogText
-                                font.family: fontInter
-                                font.pixelSize: 14
-                                font.weight: 510
-                            }
-                            
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: stackView.currentIndex = index
-                            }
-                        }
+                Repeater {
+                    model: window.pages
+                    NavItem {
+                        text: modelData.name
+                        iconSource: Qt.resolvedUrl(modelData.icon)
+                        active: window.currentPage === index
+                        shortcutHint: "Ctrl " + (index + 1)
+                        onClicked: window.currentPage = index
                     }
                 }
-                
-                Item { Layout.fillWidth: true } // spacer
-                
-                // Status / Privacy Mode indicator
+
+                Item { Layout.fillHeight: true }
+
+                // Now playing (music inside Rei, or Spotify)
                 Rectangle {
-                    height: 28
-                    width: privacyRow.width + 24
-                    radius: 14
-                    color: "transparent"
-                    border.color: colorSmokeSurface
+                    id: nowPlayingCard
+                    Layout.fillWidth: true
+                    Layout.bottomMargin: 8
+                    implicitHeight: 60
+                    radius: Theme.radiusControl + 4
+                    color: Theme.elevated
+                    visible: opacity > 0.001
+                    opacity: backend.nowPlaying !== "" ? 1 : 0
+                    Behavior on opacity { NumberAnimation { duration: Theme.page } }
+
                     RowLayout {
-                        id: privacyRow
-                        anchors.centerIn: parent
-                        spacing: 6
-                        Image {
-                            source: backend.privacyModeText === "Cloud Assisted" ? "icons/cloud.svg" : "icons/local.svg"
-                            sourceSize.width: 14; sourceSize.height: 14
-                            Layout.preferredWidth: 14; Layout.preferredHeight: 14
+                        anchors.fill: parent
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 8
+                        spacing: 10
+
+                        Rectangle {
+                            Layout.preferredWidth: 30
+                            Layout.preferredHeight: 30
+                            Layout.alignment: Qt.AlignVCenter
+                            radius: 15
+                            color: Theme.coralAlpha(0.16)
+                            Icon {
+                                anchors.centerIn: parent
+                                source: Qt.resolvedUrl("icons/music.svg")
+                                size: 14
+                                color: Theme.coral
+                            }
+                            // Gentle pulse while playing
+                            SequentialAnimation on scale {
+                                running: backend.nowPlaying !== "" && !backend.nowPlayingPaused
+                                loops: Animation.Infinite
+                                NumberAnimation { to: 1.08; duration: 600; easing.type: Easing.InOutSine }
+                                NumberAnimation { to: 1.0; duration: 600; easing.type: Easing.InOutSine }
+                            }
                         }
-                        Text {
-                            text: backend.privacyModeText || "Local Only"
-                            color: colorFogText
-                            font.family: fontInter
-                            font.pixelSize: 13
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.alignment: Qt.AlignVCenter
+                            spacing: 1
+                            Text {
+                                Layout.fillWidth: true
+                                text: backend.nowPlaying
+                                color: Theme.textPrimary
+                                font.family: Theme.fontText
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: (backend.nowPlayingSource === "spotify" ? "Spotify" : "YouTube")
+                                      + (backend.nowPlayingPaused ? " · Paused" : "")
+                                color: Theme.textMuted
+                                font.family: Theme.fontText
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        Repeater {
+                            model: [
+                                { cmd: "toggle", icon: backend.nowPlayingPaused ? "icons/play.svg" : "icons/pause.svg" },
+                                { cmd: "stop", icon: "icons/stop.svg" }
+                            ]
+                            Rectangle {
+                                required property var modelData
+                                Layout.preferredWidth: 28
+                                Layout.preferredHeight: 28
+                                Layout.alignment: Qt.AlignVCenter
+                                radius: 14
+                                color: ctl.containsMouse ? Theme.elevatedHover : "transparent"
+                                Behavior on color { ColorAnimation { duration: Theme.fast } }
+                                Icon {
+                                    anchors.centerIn: parent
+                                    source: Qt.resolvedUrl(modelData.icon)
+                                    size: 12
+                                    color: ctl.containsMouse ? Theme.textPrimary : Theme.textBody
+                                }
+                                MouseArea {
+                                    id: ctl
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: backend.sendPlayerCommand(modelData.cmd)
+                                }
+                            }
                         }
                     }
                 }
+
+                // Privacy mode switch, pinned to the bottom of the rail
+                Rectangle {
+                    id: privacyChip
+                    Layout.fillWidth: true
+                    implicitHeight: 56
+                    radius: Theme.radiusControl + 4
+                    color: privacyMouse.containsMouse ? Theme.elevated : Qt.rgba(38 / 255, 37 / 255, 59 / 255, 0.5)
+                    Behavior on color { ColorAnimation { duration: Theme.fast } }
+                    readonly property string mode: backend.privacyModeText || "Local Only"
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 16
+                        anchors.rightMargin: 16
+                        spacing: 12
+                        Icon {
+                            Layout.alignment: Qt.AlignVCenter
+                            source: Qt.resolvedUrl(privacyChip.mode === "Cloud Assisted" ? "icons/cloud.svg"
+                                                 : privacyChip.mode === "Local + Connectors" ? "icons/connectors.svg"
+                                                 : "icons/local.svg")
+                            size: 18
+                            color: Theme.textBody
+                        }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.alignment: Qt.AlignVCenter
+                            spacing: 1
+                            Text {
+                                text: backend.privacyModeText || "Local Only"
+                                color: Theme.textPrimary
+                                font.family: Theme.fontText
+                                font.pixelSize: 13
+                                font.weight: Font.DemiBold
+                            }
+                            Text {
+                                text: privacyChip.mode === "Cloud Assisted" ? "Private data is anonymised"
+                                    : privacyChip.mode === "Local + Connectors" ? "Approved services only"
+                                    : "Nothing leaves this device"
+                                color: Theme.textMuted
+                                font.family: Theme.fontText
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                        }
+                    }
+                    MouseArea {
+                        id: privacyMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: backend.togglePrivacyMode()
+                    }
+                }
+            }
+
+            // Hairline edge between rail and canvas
+            Rectangle {
+                anchors.right: parent.right
+                width: 1
+                height: parent.height
+                color: Theme.hairline
             }
         }
 
-        // MAIN CONTENT STACK
-        StackLayout {
-            id: stackView
+        // PAGES: all pages stay alive (chat history, scroll positions survive),
+        // the active one glides up and fades in; the old one fades out quickly.
+        Item {
+            id: pageHost
             Layout.fillWidth: true
             Layout.fillHeight: true
-            currentIndex: 0
+            clip: true
 
-            Loader { source: "pages/HomePage.qml" }
-            Loader { source: "pages/ActivityPage.qml" }
-            Loader { source: "pages/MemoryPage.qml" }
-            Loader { source: "pages/CapabilitiesPage.qml" }
-            Loader { source: "pages/SettingsPage.qml" }
+            Repeater {
+                model: window.pages
+                Loader {
+                    id: pageLoader
+                    required property int index
+                    required property var modelData
+                    readonly property bool current: window.currentPage === index
+                    width: pageHost.width
+                    height: pageHost.height
+                    source: modelData.source
+                    asynchronous: false
+                    z: current ? 1 : 0
+                    enabled: current
+                    // Pages may define activated() to refresh when shown (e.g. Memory)
+                    onCurrentChanged: if (current && item && typeof item.activated === "function") item.activated()
+                    visible: opacity > 0.001
+                    opacity: current ? 1 : 0
+                    Behavior on opacity {
+                        NumberAnimation { duration: pageLoader.current ? Theme.page : Theme.exit; easing.type: Easing.OutCubic }
+                    }
+                    transform: Translate {
+                        y: pageLoader.current ? 0 : 12
+                        Behavior on y { NumberAnimation { duration: Theme.page; easing.type: Easing.OutCubic } }
+                    }
+                }
+            }
         }
     }
 
@@ -164,184 +296,214 @@ font.letterSpacing: -0.15
     Rectangle {
         id: setupOverlay
         anchors.fill: parent
-        color: colorOnyxCanvas
+        color: Theme.canvas
         z: 100
-        visible: backend.needsSetup
-        opacity: visible ? 1.0 : 0.0
-        Behavior on opacity { NumberAnimation { duration: 800; easing.type: Easing.InOutQuad } }
+        opacity: backend.needsSetup ? 1 : 0
+        visible: opacity > 0.001
+        Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+
+        // Swallow clicks so nothing underneath reacts while setup is shown
+        MouseArea { anchors.fill: parent; hoverEnabled: true }
+
+        readonly property bool ready: nameField.text.trim() !== "" && purposeField.text.trim() !== ""
+        function submit() {
+            if (ready) backend.completeOnboarding(nameField.text.trim(), purposeField.text.trim())
+        }
 
         ColumnLayout {
             anchors.centerIn: parent
-            width: 440
-            spacing: 48
+            width: Math.min(480, parent.width - 80)
+            spacing: 40
+
+            VoiceOrb {
+                Layout.alignment: Qt.AlignHCenter
+                size: 120
+                st: "idle"
+            }
 
             ColumnLayout {
-                Layout.alignment: Qt.AlignHCenter
-                spacing: 16
+                Layout.fillWidth: true
+                spacing: 4
                 Text {
-                    text: "Rei"
-                    color: colorSnow
-                    font.family: fontInter
-                    font.pixelSize: 48
-                    font.weight: 590
-                    font.letterSpacing: -1.056
-                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    text: "Hello, I'm Rei."
+                    color: Theme.textPrimary
+                    font.family: Theme.fontDisplay
+                    font.pixelSize: 52
+                    font.weight: Font.DemiBold
+                    font.letterSpacing: Theme.tracking(52)
                 }
                 Text {
-                    text: "Initialization Sequence"
-                    color: colorMistText
-                    font.family: fontInter
-                    font.pixelSize: 16
-                    font.letterSpacing: -0.15
-                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    text: "Let's get acquainted."
+                    color: Theme.coral
+                    font.family: Theme.fontDisplay
+                    font.pixelSize: 52
+                    font.weight: Font.DemiBold
+                    font.letterSpacing: Theme.tracking(52)
                 }
             }
 
             ColumnLayout {
                 Layout.fillWidth: true
-                spacing: 24
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    Text { text: "What should I call you?"; color: colorFogText; font.family: fontInter; font.pixelSize: 14 }
-                    Rectangle {
-                        Layout.fillWidth: true; height: 48; radius: 4
-                        color: colorCarbonSurface
-                        border.color: nameInput.activeFocus ? colorSnow : colorAshBorder
-                        border.width: 1
-                        Behavior on border.color { ColorAnimation { duration: 200 } }
-                        TextInput {
-                            id: nameInput
-                            anchors.fill: parent; anchors.margins: 16
-                            color: colorSnow; font.family: fontInter; font.pixelSize: 16
-                            verticalAlignment: TextInput.AlignVCenter
-                        }
-                    }
+                spacing: 20
+                InputField {
+                    id: nameField
+                    label: "What should I call you?"
+                    placeholder: "Your name"
+                    onAccepted: purposeField.input.forceActiveFocus()
+                    Component.onCompleted: input.forceActiveFocus()
                 }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    Text { text: "What is your primary focus?"; color: colorFogText; font.family: fontInter; font.pixelSize: 14 }
-                    Rectangle {
-                        Layout.fillWidth: true; height: 48; radius: 4
-                        color: colorCarbonSurface
-                        border.color: purposeInput.activeFocus ? colorSnow : colorAshBorder
-                        border.width: 1
-                        Behavior on border.color { ColorAnimation { duration: 200 } }
-                        TextInput {
-                            id: purposeInput
-                            anchors.fill: parent; anchors.margins: 16
-                            color: colorSnow; font.family: fontInter; font.pixelSize: 16
-                            verticalAlignment: TextInput.AlignVCenter
-                        }
-                    }
+                InputField {
+                    id: purposeField
+                    label: "What will you mostly use me for?"
+                    placeholder: "e.g. research, writing, staying organised"
+                    onAccepted: setupOverlay.submit()
                 }
             }
 
-            Rectangle {
+            PillButton {
                 Layout.alignment: Qt.AlignHCenter
-                width: 140; height: 44; radius: 22
-                color: "transparent"; border.color: (nameInput.text.trim() && purposeInput.text.trim()) ? colorSnow : colorAshBorder; border.width: 1
-                Behavior on border.color { ColorAnimation { duration: 200 } }
-                Text { 
-                    text: "Initialize"; 
-                    color: (nameInput.text.trim() && purposeInput.text.trim()) ? colorSnow : colorFogText; 
-                    anchors.centerIn: parent; font.family: fontInter; font.pixelSize: 15; font.weight: 510 
-                    Behavior on color { ColorAnimation { duration: 200 } }
-                }
-                MouseArea {
-                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (nameInput.text.trim() !== "" && purposeInput.text.trim() !== "") {
-                            backend.completeOnboarding(nameInput.text, purposeInput.text)
-                        }
-                    }
-                }
+                text: "Initialize"
+                variant: "primary"
+                enabled: setupOverlay.ready
+                onClicked: setupOverlay.submit()
             }
         }
     }
 
-    // CONFIRMATION DIALOG OVERLAY
+    // CONFIRMATION DIALOG
     Popup {
         id: confirmDialog
         anchors.centerIn: parent
-        width: 480
-        height: 280
+        width: Math.min(480, window.width - 80)
+        padding: 28
         modal: true
         focus: true
         closePolicy: Popup.NoAutoClose
-        
-        property string intentId: ""
 
-        background: Rectangle {
-            color: colorCarbonSurface
-            border.color: colorAshBorder
-            border.width: 1
-            radius: 8
+        property string intentId: ""
+        function answer(approved) {
+            backend.sendConfirmationResponse(intentId, approved)
+            close()
         }
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 24
+        Overlay.modal: Rectangle {
+            color: Qt.rgba(8 / 255, 8 / 255, 14 / 255, 0.6)
+            Behavior on opacity { NumberAnimation { duration: Theme.page } }
+        }
+
+        enter: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.page; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "scale"; from: 0.96; to: 1; duration: Theme.page; easing.type: Easing.OutCubic }
+            }
+        }
+        exit: Transition {
+            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.exit; easing.type: Easing.OutCubic }
+        }
+
+        background: Rectangle {
+            color: Theme.elevated
+            radius: Theme.radiusCard
+            border.color: Theme.hairline
+        }
+
+        contentItem: ColumnLayout {
             spacing: 16
 
             Text {
                 id: confirmTitle
-                text: "Confirmation Required"
-                color: colorSnow
-                font.family: fontInter
-                font.pixelSize: 24
-                font.weight: 510
-font.letterSpacing: -0.288
+                Layout.fillWidth: true
+                text: "Confirmation required"
+                color: Theme.textPrimary
+                font.family: Theme.fontDisplay
+                font.pixelSize: Theme.sizeHeadingSm
+                font.weight: Font.DemiBold
+                font.letterSpacing: Theme.tracking(Theme.sizeHeadingSm)
+                wrapMode: Text.WordWrap
             }
 
             Text {
                 id: confirmMsg
                 Layout.fillWidth: true
-                Layout.fillHeight: true
                 text: ""
-                color: colorMistText
-                font.family: fontInter
-                font.pixelSize: 15
-                lineHeight: 1.5
+                color: Theme.textBody
+                font.family: Theme.fontText
+                font.pixelSize: Theme.sizeBodySm
+                lineHeight: 1.4
                 wrapMode: Text.Wrap
             }
 
+            // Voice answer hint: pulsing mic + what to say
             RowLayout {
-                Layout.alignment: Qt.AlignRight
-                spacing: 12
-
-                // Deny Button - Ghost
+                Layout.fillWidth: true
+                visible: confirmDialog.hint !== ""
+                spacing: 10
                 Rectangle {
-                    width: 80; height: 32; radius: 16
-                    color: "transparent"
-                    Text { 
-                        text: "Deny"; color: colorFogText; anchors.centerIn: parent
-                        font.family: fontInter; font.pixelSize: 14; font.weight: 510 
+                    Layout.preferredWidth: 28
+                    Layout.preferredHeight: 28
+                    Layout.alignment: Qt.AlignVCenter
+                    radius: 14
+                    color: Theme.coralAlpha(0.16)
+                    Icon {
+                        anchors.centerIn: parent
+                        source: Qt.resolvedUrl("icons/mic.svg")
+                        size: 14
+                        color: Theme.coral
                     }
-                    MouseArea {
-                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                        onClicked: { backend.sendConfirmationResponse(confirmDialog.intentId, false); confirmDialog.close() }
+                    SequentialAnimation on opacity {
+                        running: confirmDialog.opened && confirmDialog.hint !== ""
+                        loops: Animation.Infinite
+                        NumberAnimation { to: 0.45; duration: 650; easing.type: Easing.InOutSine }
+                        NumberAnimation { to: 1.0; duration: 650; easing.type: Easing.InOutSine }
                     }
                 }
-
-                // Allow Button - Outlined Pill
-                Rectangle {
-                    width: 80; height: 32; radius: 16
-                    color: "transparent"; border.color: colorSnow; border.width: 1
-                    Text { 
-                        text: "Allow"; color: colorSnow; anchors.centerIn: parent
-                        font.family: fontInter; font.pixelSize: 14; font.weight: 510 
-                    }
-                    MouseArea {
-                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                        onClicked: { backend.sendConfirmationResponse(confirmDialog.intentId, true); confirmDialog.close() }
-                    }
+                Text {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignVCenter
+                    text: confirmDialog.hint
+                    color: Theme.textPrimary
+                    font.family: Theme.fontText
+                    font.pixelSize: Theme.sizeBodySm
+                    font.weight: Font.DemiBold
+                    wrapMode: Text.WordWrap
                 }
             }
+
+            // Time left to answer
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 3
+                radius: 1.5
+                color: Qt.rgba(1, 1, 1, 0.06)
+                visible: confirmDialog.seconds > 0
+                Rectangle {
+                    height: parent.height
+                    radius: 1.5
+                    color: confirmDialog.strict ? Theme.coral : Theme.textSecondary
+                    width: parent.width * confirmDialog.remaining
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 8
+                spacing: 8
+                Item { Layout.fillWidth: true }
+                PillButton { text: "Deny"; variant: "ghost"; onClicked: confirmDialog.answer(false) }
+                PillButton { text: confirmDialog.strict ? "Confirm" : "Allow"; variant: "primary"; onClicked: confirmDialog.answer(true) }
+            }
         }
+
+        property string hint: ""
+        property int seconds: 0
+        property bool strict: false
+        property real remaining: 1.0
+        NumberAnimation on remaining { id: countdownAnim; running: false; from: 1.0; to: 0.0 }
+        onClosed: { countdownAnim.stop(); hint = ""; seconds = 0 }
     }
 
     Connections {
@@ -350,7 +512,20 @@ font.letterSpacing: -0.288
             confirmTitle.text = title
             confirmMsg.text = msg
             confirmDialog.intentId = intent_id
+            confirmDialog.hint = ""
+            confirmDialog.seconds = 0
             confirmDialog.open()
+        }
+        function onConfirmationHint(hint, seconds, strict) {
+            confirmDialog.hint = hint
+            confirmDialog.strict = strict
+            confirmDialog.seconds = seconds
+            countdownAnim.duration = seconds * 1000
+            countdownAnim.restart()
+        }
+        function onConfirmationClosed(intent_id) {
+            // Answered by voice or timed out: close without sending a response
+            if (confirmDialog.opened && confirmDialog.intentId === intent_id) confirmDialog.close()
         }
     }
 }
