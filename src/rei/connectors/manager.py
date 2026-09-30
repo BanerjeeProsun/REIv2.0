@@ -55,6 +55,11 @@ class ConnectorManager:
         connector.disconnect()
         connector.state.connected = False
         connector.state.detail = ""
+        # Capabilities can be shared (e.g. music.play by YouTube and Spotify):
+        # keep them for connectors that are still connected
+        for other in self.connectors.values():
+            if other.state.connected:
+                self._register(other)
         saved = self._read()
         saved.pop(cid, None)
         self._write(saved)

@@ -18,7 +18,8 @@ class GrantVerifier:
         
     def _canonical_json(self, data: Any) -> bytes:
         if isinstance(data, BaseModel):
-            data = data.model_dump()
+            # JSON mode, matching how the grant hashed the (normalised) intent args
+            data = data.model_dump(mode="json")
         return json.dumps(data, separators=(',', ':'), sort_keys=True).encode('utf-8')
         
     def _hash_args(self, args: Any) -> str:

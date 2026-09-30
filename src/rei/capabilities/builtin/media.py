@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Callable, Literal
 from pydantic import BaseModel, ConfigDict, Field
 from rei.capabilities.spec import CapabilitySpec, RiskTier, DataClass, RateLimit
 from rei.policy.schemas import PrivacyMode
@@ -43,7 +43,16 @@ def media_set_volume_handler(args: SetVolumeArgs) -> dict[str, str | int]:
     return {"status": "success", "volume": args.level}
 
 
-MediaAction = Literal["play", "pause", "next", "prev"]
+MediaAction = Literal["play", "pause", "next", "prev", "stop"]
+
+# Rei's own music (YouTube/Spotify connectors) registers here, so "pause" or
+# "next" control what Rei is playing before falling back to system media keys.
+_controller: Callable[[str], bool] | None = None
+
+
+def set_media_controller(controller: Callable[[str], bool] | None) -> None:
+    global _controller
+    _controller = controller
 
 
 class MediaControlArgs(BaseModel):
@@ -54,7 +63,7 @@ class MediaControlArgs(BaseModel):
 media_control_spec = CapabilitySpec(
     id="media.control",
     version=1,
-    summary="Control media playback",
+    summary="Control media playback: pause, resume, stop, next or previous track",
     tier=RiskTier.R1,
     args_model=MediaControlArgs,
     reads=frozenset(),
@@ -70,17 +79,23 @@ media_control_spec = CapabilitySpec(
 
 
 def media_control_handler(args: MediaControlArgs) -> dict[str, str]:
+    spoken = {"play": "Resuming.", "pause": "Paused.", "stop": "Stopped.",
+              "next": "Skipping ahead.", "prev": "Going back."}[args.action]
+    if _controller is not None and _controller(args.action):
+        return {"status": "success", "action": args.action, "target": "rei", "spoken": spoken}
     import ctypes
     # Virtual-Key Codes for Media Control
     VK_MEDIA_NEXT_TRACK = 0xB0
     VK_MEDIA_PREV_TRACK = 0xB1
     VK_MEDIA_PLAY_PAUSE = 0xB3
+    VK_MEDIA_STOP = 0xB2
     
     key_map = {
         "play": VK_MEDIA_PLAY_PAUSE,
         "pause": VK_MEDIA_PLAY_PAUSE,
         "next": VK_MEDIA_NEXT_TRACK,
-        "prev": VK_MEDIA_PREV_TRACK
+        "prev": VK_MEDIA_PREV_TRACK,
+        "stop": VK_MEDIA_STOP,
     }
     
     vk = key_map.get(args.action)
@@ -88,4 +103,4 @@ def media_control_handler(args: MediaControlArgs) -> dict[str, str]:
         ctypes.windll.user32.keybd_event(vk, 0, 0, 0)
         ctypes.windll.user32.keybd_event(vk, 0, 2, 0) # Key up
         
-    return {"status": "success", "action": args.action}
+    return {"status": "success", "action": args.action, "spoken": spoken}

@@ -97,8 +97,9 @@ class UIClientWired:
             if self.say is not None:
                 question = f"{action}. {'Say confirm to go ahead, or no.' if strict else 'Should I? Say yes or no.'}"
                 # Answering by click while Rei is still talking is fine
-                speak = asyncio.ensure_future(self.say(question))
-                await asyncio.wait([speak, click], return_when=asyncio.FIRST_COMPLETED)
+                speak: asyncio.Future[Any] = asyncio.ensure_future(self.say(question))
+                first: list[asyncio.Future[Any]] = [speak, click]
+                await asyncio.wait(first, return_when=asyncio.FIRST_COMPLETED)
                 if click.done():
                     speak.cancel()
                     return click.result()

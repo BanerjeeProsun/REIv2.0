@@ -17,6 +17,7 @@ forbidden_modules =
 ignore_imports =
     rei.models.nim_planner -> httpx
     rei.egress.gate -> httpx
+    rei.egress.spotify_http -> httpx
     rei.capabilities.builtin.files -> httpx
 
 [importlinter:contract:no-subprocess]

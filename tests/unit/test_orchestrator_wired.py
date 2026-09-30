@@ -1,5 +1,6 @@
 import pytest
 import secrets
+from typing import Any
 from unittest.mock import patch, MagicMock
 from rei.core.orchestrator import Orchestrator
 from rei.core.cancellation import CancelToken
@@ -338,3 +339,96 @@ async def test_small_model_can_type_after_opening_an_app() -> None:
     for utterance in ["open notepad and type hello", "open notepad then write hello"]:
         result = await orch.process_turn(utterance, _build_ctx(), CancelToken())
         assert [i.capability for i in result.intents] == ["apps.open", "system.type_text"], utterance
+
+
+@pytest.mark.asyncio
+async def test_play_music_beats_media_control_for_the_small_model() -> None:
+    from rei.connectors.music import music_play_spec
+
+    class _Music(_Local):
+        async def generate(self, prompt: str, cancel_token: CancelToken, deadline_ms: int = 5000) -> str:
+            return _plan("", ("media.control", {"action": "play"}), ("music.play", {"query": "lofi hip hop"}))
+
+    orch = _cloud_orchestrator(_Cloud(), _Music())
+    orch.registry.register(music_play_spec, lambda a: {"status": "success"})
+    orch.executor.execute = MagicMock(return_value={"status": "success"})  # type: ignore[method-assign]
+    ctx = _build_ctx()
+    ctx = PolicyContext(session_id=ctx.session_id, turn_id=ctx.turn_id, origin=ctx.origin,
+                        privacy_mode=PrivacyMode.LOCAL_PLUS_WEB, taint=frozenset(), settings={}, recent=None)
+    result = await orch.process_turn("play lofi hip hop", ctx, CancelToken())
+    assert [i.capability for i in result.intents] == ["music.play"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("utterance, action", [
+    ("pause the music", "pause"), ("stop", "stop"), ("Stop the music.", "stop"),
+    ("next song", "next"), ("skip", "next"), ("resume", "play"), ("please pause", "pause"),
+])
+async def test_media_shortcuts_skip_the_model(utterance: str, action: str) -> None:
+    class _Never(_Local):
+        async def generate(self, prompt: str, cancel_token: CancelToken, deadline_ms: int = 5000) -> str:
+            raise AssertionError("model must not be called for a media shortcut")
+
+    orch = _cloud_orchestrator(_Cloud(), _Never())
+    orch.executor.execute = MagicMock(return_value={"status": "success", "spoken": "Paused."})  # type: ignore[method-assign]
+    result = await orch.process_turn(utterance, _build_ctx(), CancelToken())
+    assert [(i.capability, i.args) for i in result.intents] == [("media.control", {"action": action})]
+    assert result.reply == "Paused."
+
+
+@pytest.mark.asyncio
+async def test_play_with_a_query_is_not_a_shortcut() -> None:
+    orch = _build_orchestrator()
+    assert orch._shortcut("play lofi hip hop") is None and orch._shortcut("stop wasting my time") is None
+
+
+@pytest.mark.asyncio
+async def test_real_executor_results_are_unwrapped_for_spoken_and_taint() -> None:
+    """No executor mock: the real Executor wraps handler output as {"status", "data"}."""
+    from rei.connectors.email import email_list_spec
+
+    class _Inbox(_Local):
+        async def generate(self, prompt: str, cancel_token: CancelToken, deadline_ms: int = 5000) -> str:
+            return _plan("", ("email.list_recent", {"count": 5}))
+
+    orch = _cloud_orchestrator(_Cloud(), _Inbox())
+    orch.registry.register(email_list_spec, lambda a: {
+        "status": "success", "taint": "EMAIL", "content": "1. Bob: Lunch", "spoken": "You have 1 recent email."})
+    ctx = _build_ctx()
+    ctx = PolicyContext(session_id=ctx.session_id, turn_id=ctx.turn_id, origin=ctx.origin,
+                        privacy_mode=PrivacyMode.LOCAL_PLUS_WEB, taint=frozenset(), settings={}, recent=None)
+    result = await orch.process_turn("check my email inbox", ctx, CancelToken())
+    assert result.reply == "You have 1 recent email."
+    assert result.execution_results[0]["taint"] == "EMAIL"
+
+
+@pytest.mark.asyncio
+async def test_handler_errors_are_reported_without_executor_prefix() -> None:
+    class _Vol(_Local):
+        async def generate(self, prompt: str, cancel_token: CancelToken, deadline_ms: int = 5000) -> str:
+            return _plan("", ("media.set_volume", {"level": 30}))
+
+    def boom(args: Any) -> Any:
+        raise RuntimeError("audio device missing")
+
+    orch = _cloud_orchestrator(_Cloud(), _Vol())
+    orch.registry._handlers["media.set_volume"] = boom
+    result = await orch.process_turn("set volume to 30", _build_ctx(), CancelToken())
+    assert result.reply == "That didn't work (Set volume to 30%): audio device missing."
+
+
+@pytest.mark.asyncio
+@patch("os.startfile", create=True)
+async def test_url_args_pass_grant_verification(mock_startfile: MagicMock) -> None:
+    """Real executor + verifier with a pydantic HttpUrl arg (JSON-mode hashing)."""
+    class _Url(_Local):
+        async def generate(self, prompt: str, cancel_token: CancelToken, deadline_ms: int = 5000) -> str:
+            return _plan("", ("web.open_url", {"url": "https://example.com/docs"}))
+
+    orch = _cloud_orchestrator(_Cloud(), _Url())
+    ctx = _build_ctx()
+    ctx = PolicyContext(session_id=ctx.session_id, turn_id=ctx.turn_id, origin=ctx.origin,
+                        privacy_mode=PrivacyMode.LOCAL_PLUS_WEB, taint=frozenset(), settings={}, recent=None)
+    result = await orch.process_turn("open the url example.com/docs in the browser", ctx, CancelToken())
+    assert result.execution_results and result.execution_results[0]["status"] == "success", result.reply
+    mock_startfile.assert_called_once()

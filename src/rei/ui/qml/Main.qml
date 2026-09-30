@@ -97,6 +97,99 @@ ApplicationWindow {
 
                 Item { Layout.fillHeight: true }
 
+                // Now playing (music inside Rei, or Spotify)
+                Rectangle {
+                    id: nowPlayingCard
+                    Layout.fillWidth: true
+                    Layout.bottomMargin: 8
+                    implicitHeight: 60
+                    radius: Theme.radiusControl + 4
+                    color: Theme.elevated
+                    visible: opacity > 0.001
+                    opacity: backend.nowPlaying !== "" ? 1 : 0
+                    Behavior on opacity { NumberAnimation { duration: Theme.page } }
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 8
+                        spacing: 10
+
+                        Rectangle {
+                            Layout.preferredWidth: 30
+                            Layout.preferredHeight: 30
+                            Layout.alignment: Qt.AlignVCenter
+                            radius: 15
+                            color: Theme.coralAlpha(0.16)
+                            Icon {
+                                anchors.centerIn: parent
+                                source: Qt.resolvedUrl("icons/music.svg")
+                                size: 14
+                                color: Theme.coral
+                            }
+                            // Gentle pulse while playing
+                            SequentialAnimation on scale {
+                                running: backend.nowPlaying !== "" && !backend.nowPlayingPaused
+                                loops: Animation.Infinite
+                                NumberAnimation { to: 1.08; duration: 600; easing.type: Easing.InOutSine }
+                                NumberAnimation { to: 1.0; duration: 600; easing.type: Easing.InOutSine }
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.alignment: Qt.AlignVCenter
+                            spacing: 1
+                            Text {
+                                Layout.fillWidth: true
+                                text: backend.nowPlaying
+                                color: Theme.textPrimary
+                                font.family: Theme.fontText
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: (backend.nowPlayingSource === "spotify" ? "Spotify" : "YouTube")
+                                      + (backend.nowPlayingPaused ? " · Paused" : "")
+                                color: Theme.textMuted
+                                font.family: Theme.fontText
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        Repeater {
+                            model: [
+                                { cmd: "toggle", icon: backend.nowPlayingPaused ? "icons/play.svg" : "icons/pause.svg" },
+                                { cmd: "stop", icon: "icons/stop.svg" }
+                            ]
+                            Rectangle {
+                                required property var modelData
+                                Layout.preferredWidth: 28
+                                Layout.preferredHeight: 28
+                                Layout.alignment: Qt.AlignVCenter
+                                radius: 14
+                                color: ctl.containsMouse ? Theme.elevatedHover : "transparent"
+                                Behavior on color { ColorAnimation { duration: Theme.fast } }
+                                Icon {
+                                    anchors.centerIn: parent
+                                    source: Qt.resolvedUrl(modelData.icon)
+                                    size: 12
+                                    color: ctl.containsMouse ? Theme.textPrimary : Theme.textBody
+                                }
+                                MouseArea {
+                                    id: ctl
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: backend.sendPlayerCommand(modelData.cmd)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Privacy mode switch, pinned to the bottom of the rail
                 Rectangle {
                     id: privacyChip

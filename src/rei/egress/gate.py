@@ -41,8 +41,18 @@ class EgressGate:
         if self.current_mode == PrivacyMode.LOCAL_ONLY:
             raise EgressBlockedError("Egress blocked in LOCAL_ONLY mode")
 
+    def _is_connector_host(self, destination: str) -> bool:
+        """Exact match, or a suffix entry starting with "." (e.g. ".googlevideo.com"
+        for YouTube's per-stream hosts like rr3---sn-abc.googlevideo.com)."""
+        host = destination.lower().rstrip(".")
+        for entry in self.connector_hosts():
+            entry = entry.lower()
+            if host == entry or (entry.startswith(".") and host.endswith(entry)):
+                return True
+        return False
+
     def _assert_host_allowlisted(self, destination: str) -> None:
-        if destination.lower() in {h.lower() for h in self.connector_hosts()}:
+        if self._is_connector_host(destination):
             if self.current_mode not in CONNECTOR_MODES:
                 raise EgressBlockedError(f"Host {destination} not allowed in mode {self.current_mode.value}")
             return

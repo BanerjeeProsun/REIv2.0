@@ -128,6 +128,30 @@ class ReiBackend(QObject):
     def disconnectConnector(self, cid: str):
         self.disconnectRequested.emit(cid)
 
+    # Music now playing (sidebar mini player)
+    nowPlayingChanged = Signal()
+    playerCommand = Signal(str)  # "toggle" | "stop" | "next"
+
+    @Property(str, notify=nowPlayingChanged)
+    def nowPlaying(self):
+        return getattr(self, "_now_playing", "")
+
+    @Property(bool, notify=nowPlayingChanged)
+    def nowPlayingPaused(self):
+        return getattr(self, "_now_paused", False)
+
+    @Property(str, notify=nowPlayingChanged)
+    def nowPlayingSource(self):
+        return getattr(self, "_now_source", "")
+
+    def set_now_playing(self, title: str, paused: bool, source: str) -> None:
+        self._now_playing, self._now_paused, self._now_source = title, paused, source
+        self.nowPlayingChanged.emit()
+
+    @Slot(str)
+    def sendPlayerCommand(self, command: str):
+        self.playerCommand.emit(command)
+
     @Property(str, notify=privacyModeChanged)
     def privacyModeText(self):
         return getattr(self, '_privacy_mode', "Local Only")

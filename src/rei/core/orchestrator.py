@@ -84,12 +84,19 @@ class Orchestrator:
             # 2. Propose
             cancel_token.raise_if_cancelled()
             specs = self.registry.get_all_specs() if allow_actions else []
-            raw_output, vault = await self._propose(utterance, ctx, cancel_token, audit_events, specs)
-            audit_events.append({"stage": "propose", "output_len": len(raw_output)})
+            shortcut = self._shortcut(utterance) if allow_actions else None
+            if shortcut is not None:
+                # Unambiguous commands ("pause", "next song") skip the model:
+                # instant, and a small model can't misread them. Policy still applies.
+                raw_output, vault = shortcut, None
+                audit_events.append({"stage": "propose", "shortcut": True})
+            else:
+                raw_output, vault = await self._propose(utterance, ctx, cancel_token, audit_events, specs)
+                audit_events.append({"stage": "propose", "output_len": len(raw_output)})
 
             # 3. Parse
             intents = self._parse(raw_output) if allow_actions else []
-            if self._planned_by_small_model(vault):
+            if shortcut is None and self._planned_by_small_model(vault):
                 grounded = self._ground_intents(intents, utterance)
                 if len(grounded) != len(intents):
                     audit_events.append({
@@ -135,6 +142,7 @@ class Orchestrator:
 
             for intent in intents:
                 cancel_token.raise_if_cancelled()
+                intent = self._normalise_args(intent)
 
                 # 4. Decide
                 decision = self._decide(intent, ctx)
@@ -184,28 +192,27 @@ class Orchestrator:
                 if isinstance(taint, str) and taint in TaintType.__members__:
                     ctx = ContentGuard().propagate_taint(ctx, [TaintType(taint)])
 
-            # 8. Report: speak real results when a capability returned content
-            content_results = [
-                (i, r) for i, status, r in outcomes
-                if status == "executed" and r is not None and isinstance(r.get("content"), str)
-            ]
-            if content_results and all(isinstance(r.get("spoken"), str) for _, r in content_results):
-                # The capability supplied its own spoken summary: use it verbatim
-                reply = " ".join(str(r["spoken"]) for _, r in content_results)
-                audit_events.append({"stage": "summarize", "mode": "spoken",
-                                     "sources": [i.capability for i, _ in content_results]})
-                rest = [o for o in outcomes if o[1] != "executed"]
-                if rest:
-                    reply = f"{reply} {self._report(rest)}"
-            elif content_results:
-                reply = await self._summarize_results(utterance, content_results, cancel_token)
-                audit_events.append({"stage": "summarize", "sources": [i.capability for i, _ in content_results]})
-                # Mention anything else that didn't go through
-                rest = [o for o in outcomes if o[1] != "executed"]
-                if rest:
-                    reply = f"{reply} {self._report(rest)}"
-            else:
-                reply = self._report(outcomes)
+            # 8. Report. Per executed intent, in order of preference:
+            #  - its own "spoken" line (deterministic, e.g. "Playing X.", an inbox summary)
+            #  - a tool-free model summary of returned "content" (untrusted, fenced)
+            #  - the generic "Done: ..." report
+            parts: list[str] = []
+            to_summarize: list[tuple[IntentProposal, dict[str, Any]]] = []
+            rest: list[tuple[IntentProposal, str, dict[str, Any] | None]] = []
+            for intent, status, r in outcomes:
+                if status == "executed" and r is not None and r.get("status") == "success" \
+                        and isinstance(r.get("spoken"), str):
+                    parts.append(str(r["spoken"]))
+                elif status == "executed" and r is not None and isinstance(r.get("content"), str):
+                    to_summarize.append((intent, r))
+                else:
+                    rest.append((intent, status, r))
+            if to_summarize:
+                parts.append(await self._summarize_results(utterance, to_summarize, cancel_token))
+                audit_events.append({"stage": "summarize", "sources": [i.capability for i, _ in to_summarize]})
+            if rest:
+                parts.append(self._report(rest))
+            reply = " ".join(p for p in parts if p) or "No actions were taken."
             if vault is not None:
                 reply = vault.rehydrate(reply)
             self._write_audit(audit_events)
@@ -354,7 +361,14 @@ class Orchestrator:
             if properties.get(key, {}).get("enum") and isinstance(value, str) and value.lower() in words:
                 enum_hits += 1
                 action_hit = action_hit or key == "action"
-        return keyword_hits > 0 or action_hit, keyword_hits + enum_hits
+        # Free-text args that echo the user's words (e.g. music.play's query
+        # "lofi hip hop") mark the more specific capability: a scoring bonus only,
+        # never a reason to keep an intent on its own.
+        echo = 0
+        for key, value in intent.args.items():
+            if isinstance(value, str) and not properties.get(key, {}).get("enum"):
+                echo += sum(1 for w in set(re.findall(r"[a-z0-9]+", value.lower())) if len(w) >= 3 and w in words)
+        return keyword_hits > 0 or action_hit, keyword_hits + enum_hits + min(echo, 3)
 
     def _ground_intents(self, intents: list[IntentProposal], utterance: str) -> list[IntentProposal]:
         scored = [(i, *self._grounding_score(i, utterance)) for i in intents]
@@ -364,6 +378,34 @@ class Orchestrator:
             # One request, one action: keep the best-supported intent
             grounded = [max(grounded, key=lambda pair: pair[1])]
         return [i for i, _ in grounded]
+
+    _MEDIA_SHORTCUT = re.compile(
+        r"^(?:(?:please|can you|could you)\s+)?"
+        r"(pause|stop|resume|continue|unpause|play|next|skip|previous|go back)"
+        r"(?:\s+(?:the|this|that|my))?(?:\s+(?:music|song|track|playback|it|audio))?"
+        r"(?:\s+please)?[\s.!?]*$",
+        re.IGNORECASE,
+    )
+    _MEDIA_ACTIONS = {"pause": "pause", "stop": "stop", "resume": "play", "continue": "play",
+                      "unpause": "play", "play": "play", "next": "next", "skip": "next",
+                      "previous": "prev", "go back": "prev"}
+
+    def _shortcut(self, utterance: str) -> str | None:
+        """Plan for commands too simple to need a model, e.g. "pause the music",
+        "next song", "stop". Returns planner-style JSON, or None."""
+        match = self._MEDIA_SHORTCUT.match(utterance.strip())
+        if not match:
+            return None
+        try:
+            spec = self.registry.get_spec("media.control")
+        except Exception:
+            return None
+        import json
+        action = self._MEDIA_ACTIONS[match.group(1).lower()]
+        return json.dumps({"reply": "", "intents": [{
+            "type": "intent", "capability": spec.id, "capability_version": spec.version,
+            "args": {"action": action}, "rationale": "media shortcut",
+        }]})
 
     def _parse(self, raw_output: str) -> list[IntentProposal]:
         try:
@@ -410,8 +452,25 @@ class Orchestrator:
             result: dict[str, Any] = await asyncio.to_thread(self.executor.execute, grant, validated_args, mac)
         except Exception as e:
             print(f"[Orchestrator] {intent.capability} failed: {e}")
-            return {"status": "error", "error": str(e)}
+            error = str(e).removeprefix("Capability execution failed: ")
+            return {"status": "error", "error": error}
+        # The executor wraps the handler's return value as {"status", "data"}.
+        # Lift the handler's fields (spoken, content, taint...) so they are seen.
+        data = result.get("data") if isinstance(result, dict) else None
+        if isinstance(data, dict):
+            return {**data, "status": data.get("status", result.get("status", "success"))}
         return result
+
+    def _normalise_args(self, intent: IntentProposal) -> IntentProposal:
+        """Fill in defaults so the grant hashes exactly what the executor will
+        run (a model often omits optional args; the executor validates them
+        into the full set, which used to fail grant verification)."""
+        try:
+            spec = self.registry.get_spec(intent.capability)
+            full = spec.args_model.model_validate(intent.args).model_dump(mode="json")
+        except Exception:
+            return intent  # invalid args: let the policy engine reject them
+        return intent.model_copy(update={"args": full})
 
     def _describe(self, intent: IntentProposal) -> str:
         """Human phrase for an intent, from its own confirm template (not the

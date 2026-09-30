@@ -151,9 +151,32 @@ def main() -> None:
     from rei.connectors.email import EmailConnector
     from rei.config.secrets import SecretManager
     egress_gate = EgressGate(policy_config_model, PrivacyMode.LOCAL_ONLY)
+
+    # Music: an in-app player (YouTube via yt-dlp) and Spotify, behind one "music.play"
+    from rei.connectors.music import MusicHub
+    from rei.connectors.youtube import YouTubeConnector
+    from rei.connectors.spotify import SpotifyConnector
+    from rei.egress.stream import open_audio
+    from rei.voice.player import MusicPlayer
+    from rei.capabilities.builtin.media import set_media_controller
+    now_playing_listeners: list[Any] = []
+
+    def on_player_change() -> None:
+        # The player reports from audio/decoder threads; hop to the UI thread
+        for fn in now_playing_listeners:
+            loop.call_soon_threadsafe(fn)
+
+    player = MusicPlayer(
+        opener=lambda url, headers: open_audio(egress_gate, url, headers),
+        on_change=on_player_change,
+    )
+    music = MusicHub()
     connectors = ConnectorManager(registry, app_data / "connectors.json", [
         EmailConnector(egress_gate, SecretManager()),
+        YouTubeConnector(egress_gate, music, player),
+        SpotifyConnector(egress_gate, SecretManager(), music),
     ])
+    set_media_controller(music.control)
     egress_gate.connector_hosts = connectors.hosts
     connectors.load()
 
@@ -230,12 +253,19 @@ def main() -> None:
     def busy() -> bool:
         return active_turns["n"] > 0 or confirmer.pending
 
+    from rei.voice.wake import strip_wake_word
+
     def route_input(text: str, origin: Origin) -> None:
         """Every utterance or typed message enters here. While Rei is waiting
         for a confirmation, the input answers it instead of starting a turn."""
         text = text.strip()
         if not text:
             return
+        if origin == Origin.USER_VOICE and player.active and not player.paused and not confirmer.pending:
+            command = strip_wake_word(text)
+            if command is None:
+                return  # probably the song, not the user
+            text = command
         if confirmer.pending:
             if confirmer.offer(text):
                 ui.add_message(text, True)
@@ -254,6 +284,7 @@ def main() -> None:
         if show_user:
             ui.add_message(text, True)
         active_turns["n"] += 1
+        player.duck(True)  # music goes quiet while Rei listens/thinks/speaks
         async with turn_lock:
             ui.set_state("processing")
             try:
@@ -267,6 +298,7 @@ def main() -> None:
                     recent=None,
                 )
                 result = await orchestrator.process_turn(text, ctx, CancelToken(), allow_actions=allow_actions)
+                update_now_playing()  # e.g. Spotify started playing on another device
                 ui.add_message(result.reply, False)
                 await speaker.say(result.reply, on_start=lambda: ui.set_state("speaking"))
             except asyncio.CancelledError:
@@ -276,6 +308,8 @@ def main() -> None:
                 ui.add_message("Sorry, something went wrong while handling that.", False)
             finally:
                 active_turns["n"] -= 1
+                if active_turns["n"] == 0:
+                    player.duck(False)
                 ui.set_rest_state()
 
     def on_setup(name: str, purpose: str) -> None:
@@ -358,6 +392,28 @@ def main() -> None:
         refresh_models()
         ui.backend.connectorResult.emit(cid, True, "Disconnected.")
 
+    def update_now_playing() -> None:
+        if player.active:
+            ui.backend.set_now_playing(player.title, player.paused, "youtube")
+        elif music.current == "spotify" and music.now_playing:
+            ui.backend.set_now_playing(music.now_playing, False, "spotify")
+        else:
+            ui.backend.set_now_playing("", False, "")
+
+    now_playing_listeners.append(update_now_playing)
+
+    async def player_command(command: str) -> None:
+        action = {"toggle": "pause" if not player.paused else "play", "stop": "stop", "next": "next"}.get(command)
+        if music.current == "spotify" and command == "toggle":
+            action = "pause"
+        if action:
+            try:
+                await asyncio.to_thread(music.control, action)
+            except Exception as e:
+                print(f"[music] {command} failed: {e}")
+        update_now_playing()
+
+    ui.backend.playerCommand.connect(lambda command: spawn(player_command(command)))
     ui.backend.connectRequested.connect(lambda cid, params: spawn(connect_connector(cid, params)))
     ui.backend.disconnectRequested.connect(lambda cid: spawn(disconnect_connector(cid)))
 
