@@ -23,6 +23,11 @@ class CapabilityRegistry:
         self._specs[spec.id] = spec
         self._handlers[spec.id] = handler
 
+    def unregister(self, capability_id: str) -> None:
+        """Remove a capability (e.g. when its connector is disconnected)."""
+        self._specs.pop(capability_id, None)
+        self._handlers.pop(capability_id, None)
+
     def get_spec(self, capability_id: str) -> CapabilitySpec:
         if capability_id not in self._specs:
             raise UnknownCapabilityError(f"UNKNOWN_CAPABILITY: {capability_id}")

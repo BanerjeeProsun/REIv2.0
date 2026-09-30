@@ -20,6 +20,7 @@ ApplicationWindow {
         { name: "Activity",     icon: "icons/activity.svg",     source: "pages/ActivityPage.qml" },
         { name: "Memory",       icon: "icons/memory.svg",       source: "pages/MemoryPage.qml" },
         { name: "Capabilities", icon: "icons/capabilities.svg", source: "pages/CapabilitiesPage.qml" },
+        { name: "Connectors",   icon: "icons/connectors.svg",   source: "pages/ConnectorsPage.qml" },
         { name: "Settings",     icon: "icons/settings.svg",     source: "pages/SettingsPage.qml" }
     ]
 
@@ -104,7 +105,7 @@ ApplicationWindow {
                     radius: Theme.radiusControl + 4
                     color: privacyMouse.containsMouse ? Theme.elevated : Qt.rgba(38 / 255, 37 / 255, 59 / 255, 0.5)
                     Behavior on color { ColorAnimation { duration: Theme.fast } }
-                    readonly property bool cloud: backend.privacyModeText === "Cloud Assisted"
+                    readonly property string mode: backend.privacyModeText || "Local Only"
 
                     RowLayout {
                         anchors.fill: parent
@@ -113,7 +114,9 @@ ApplicationWindow {
                         spacing: 12
                         Icon {
                             Layout.alignment: Qt.AlignVCenter
-                            source: Qt.resolvedUrl(privacyChip.cloud ? "icons/cloud.svg" : "icons/local.svg")
+                            source: Qt.resolvedUrl(privacyChip.mode === "Cloud Assisted" ? "icons/cloud.svg"
+                                                 : privacyChip.mode === "Local + Connectors" ? "icons/connectors.svg"
+                                                 : "icons/local.svg")
                             size: 18
                             color: Theme.textBody
                         }
@@ -129,7 +132,9 @@ ApplicationWindow {
                                 font.weight: Font.DemiBold
                             }
                             Text {
-                                text: privacyChip.cloud ? "Private data is anonymised" : "Nothing leaves this device"
+                                text: privacyChip.mode === "Cloud Assisted" ? "Private data is anonymised"
+                                    : privacyChip.mode === "Local + Connectors" ? "Approved services only"
+                                    : "Nothing leaves this device"
                                 color: Theme.textMuted
                                 font.family: Theme.fontText
                                 font.pixelSize: 11

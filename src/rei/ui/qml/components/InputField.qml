@@ -9,6 +9,7 @@ ColumnLayout {
     property string placeholder: ""
     property alias text: field.text
     property alias input: field
+    property bool secret: false
     signal accepted()
 
     Layout.fillWidth: true
@@ -48,6 +49,8 @@ ColumnLayout {
             font.family: Theme.fontText
             font.pixelSize: Theme.sizeBody
             clip: true
+            echoMode: root.secret ? TextInput.Password : TextInput.Normal
+            passwordCharacter: "•"
             onAccepted: root.accepted()
 
             Text {

@@ -82,9 +82,11 @@ class PromptBuilder:
     # String length bounds are left out on purpose: large ones (e.g. a 2048-char
     # URL) explode into repetition rules that crash llama.cpp. Pydantic still
     # enforces them when the intent is validated.
+    # anyOf is kept so Optional fields stay "string or null" (without it the
+    # grammar allows any value and small models paste the schema in as the arg)
     _GRAMMAR_KEYS = frozenset({
         "type", "properties", "required", "enum", "items", "additionalProperties",
-        "minimum", "maximum", "maxItems", "minItems",
+        "minimum", "maximum", "maxItems", "minItems", "anyOf",
     })
 
     @classmethod

@@ -9,7 +9,7 @@ Rectangle {
     property int currentIndex: 0
     signal selected(int index)
 
-    readonly property int segmentWidth: 128
+    property int segmentWidth: 128
     implicitWidth: segmentWidth * options.length + 8
     implicitHeight: 40
     Layout.preferredWidth: implicitWidth

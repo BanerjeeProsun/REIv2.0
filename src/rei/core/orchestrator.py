@@ -189,7 +189,15 @@ class Orchestrator:
                 (i, r) for i, status, r in outcomes
                 if status == "executed" and r is not None and isinstance(r.get("content"), str)
             ]
-            if content_results:
+            if content_results and all(isinstance(r.get("spoken"), str) for _, r in content_results):
+                # The capability supplied its own spoken summary: use it verbatim
+                reply = " ".join(str(r["spoken"]) for _, r in content_results)
+                audit_events.append({"stage": "summarize", "mode": "spoken",
+                                     "sources": [i.capability for i, _ in content_results]})
+                rest = [o for o in outcomes if o[1] != "executed"]
+                if rest:
+                    reply = f"{reply} {self._report(rest)}"
+            elif content_results:
                 reply = await self._summarize_results(utterance, content_results, cancel_token)
                 audit_events.append({"stage": "summarize", "sources": [i.capability for i, _ in content_results]})
                 # Mention anything else that didn't go through

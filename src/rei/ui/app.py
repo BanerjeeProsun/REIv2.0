@@ -104,10 +104,29 @@ class ReiBackend(QObject):
 
     privacyModeChanged = Signal()
     privacyModeToggled = Signal()
+    privacyModeSelected = Signal(str)
 
     @Slot()
     def togglePrivacyMode(self):
         self.privacyModeToggled.emit()
+
+    @Slot(str)
+    def setPrivacyMode(self, mode: str):
+        """mode: "Local Only", "Local + Connectors" or "Cloud Assisted"."""
+        self.privacyModeSelected.emit(mode)
+
+    # Connectors (Email, YouTube, Spotify...)
+    connectRequested = Signal(str, str)      # connector id, JSON params
+    disconnectRequested = Signal(str)        # connector id
+    connectorResult = Signal(str, bool, str) # connector id, ok, message
+
+    @Slot(str, str)
+    def connectConnector(self, cid: str, params_json: str):
+        self.connectRequested.emit(cid, params_json)
+
+    @Slot(str)
+    def disconnectConnector(self, cid: str):
+        self.disconnectRequested.emit(cid)
 
     @Property(str, notify=privacyModeChanged)
     def privacyModeText(self):
@@ -146,17 +165,22 @@ class ReiUI:
             print("CRITICAL: Failed to load QML UI.")
             sys.exit(-1)
 
-    def set_context(self, store, registry, policy_config):
-        from rei.ui.models import MemoryModel, CapabilityModel
+    PRIVACY_MODES = {"local_only": "Local Only", "local_plus_web": "Local + Connectors",
+                     "cloud_assisted": "Cloud Assisted"}
+
+    def set_context(self, store, registry, policy_config, connectors=None):
+        from rei.ui.models import MemoryModel, CapabilityModel, ConnectorModel
         self.memory_model = MemoryModel(store)
         self.capability_model = CapabilityModel(registry)
+        self.connector_model = ConnectorModel(connectors)
         
         self.engine.rootContext().setContextProperty("memoryModel", self.memory_model)
         self.engine.rootContext().setContextProperty("capabilityModel", self.capability_model)
+        self.engine.rootContext().setContextProperty("connectorModel", self.connector_model)
         
         # Determine privacy mode
-        mode = policy_config.get("defaults", {}).get("privacy_mode", "local_only")
-        self.backend.privacyModeText = "Cloud Assisted" if mode == "cloud_assisted" else "Local Only"
+        mode = str(policy_config.get("defaults", {}).get("privacy_mode", "local_only")).lower()
+        self.backend.privacyModeText = self.PRIVACY_MODES.get(mode, "Local Only")
 
         # Check if onboarding is needed
         profile = store.read("user_profile")

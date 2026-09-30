@@ -8,21 +8,26 @@ PageScaffold {
     title: "Settings"
     subtitle: "Control what Rei can see, where it thinks, and how it sounds."
 
-    readonly property bool cloud: backend.privacyModeText === "Cloud Assisted"
+    readonly property var modes: ["Local Only", "Local + Connectors", "Cloud Assisted"]
+    readonly property int modeIndex: Math.max(0, modes.indexOf(backend.privacyModeText))
+    readonly property var descriptions: [
+        "Everything runs on this device. Nothing you say or type leaves your computer.",
+        "Rei still thinks on-device, but services you connect (email, music) can go online.",
+        "Complex requests use the cloud planner. Names, emails and secrets are replaced on-device before anything is sent."
+    ]
 
     SectionLabel { text: "Privacy" }
 
     SettingRow {
-        title: page.cloud ? "Cloud Assisted" : "Local Only"
-        description: page.cloud
-            ? "Complex requests use the cloud planner. Names, emails and secrets are replaced on-device before anything is sent."
-            : "Everything runs on this device. Nothing you say or type leaves your computer."
-        iconSource: Qt.resolvedUrl(page.cloud ? "../icons/cloud.svg" : "../icons/local.svg")
+        title: page.modes[page.modeIndex]
+        description: page.descriptions[page.modeIndex]
+        iconSource: Qt.resolvedUrl(["../icons/local.svg", "../icons/connectors.svg", "../icons/cloud.svg"][page.modeIndex])
 
         SegmentedControl {
-            options: ["Local only", "Cloud assisted"]
-            currentIndex: page.cloud ? 1 : 0
-            onSelected: backend.togglePrivacyMode()
+            options: ["Local", "+ Connectors", "Cloud"]
+            segmentWidth: 104
+            currentIndex: page.modeIndex
+            onSelected: (index) => backend.setPrivacyMode(page.modes[index])
         }
     }
 

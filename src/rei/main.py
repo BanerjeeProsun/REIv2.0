@@ -41,7 +41,7 @@ for _stream in (sys.stdout, sys.stderr):
         _stream.reconfigure(encoding="utf-8", errors="replace")
 
 def create_orchestrator(ui: 'ReiUI', registry: Any, store: Any, policy_config_model: Any, grant_key: bytes,
-                        ui_client: Any) -> Orchestrator:
+                        ui_client: Any, egress_gate: Any) -> Orchestrator:
     policy_config = policy_config_model.model_dump()
     policy_engine = PolicyEngine(registry, policy_config, grant_key)
 
@@ -49,9 +49,6 @@ def create_orchestrator(ui: 'ReiUI', registry: Any, store: Any, policy_config_mo
     from rei.models.nim_planner import CloudAssistedPlanner
     from rei.models.local_planner import LocalPlanner
     from rei.models.router import ModelRouter
-    from rei.egress.gate import EgressGate
-
-    egress_gate = EgressGate(policy_config_model, PrivacyMode.CLOUD_ASSISTED)
 
     try:
         cloud_model = CloudAssistedPlanner(egress_gate, "meta/llama-3.2-11b-vision-instruct")
@@ -147,8 +144,21 @@ def main() -> None:
 
     policy_config_model = load_policy_config("src/rei/policy/policy.toml")
 
+    # One egress gate for everything that talks to the network. Connectors add
+    # only the hosts of services the user has connected.
+    from rei.egress.gate import EgressGate
+    from rei.connectors import ConnectorManager
+    from rei.connectors.email import EmailConnector
+    from rei.config.secrets import SecretManager
+    egress_gate = EgressGate(policy_config_model, PrivacyMode.LOCAL_ONLY)
+    connectors = ConnectorManager(registry, app_data / "connectors.json", [
+        EmailConnector(egress_gate, SecretManager()),
+    ])
+    egress_gate.connector_hosts = connectors.hosts
+    connectors.load()
+
     ui = ReiUI()
-    ui.set_context(store, registry, policy_config_model.model_dump())
+    ui.set_context(store, registry, policy_config_model.model_dump(), connectors=connectors)
     ui.show()
 
     # Initialize TTS
@@ -196,10 +206,16 @@ def main() -> None:
         voice_window_s=float(defaults.voice_confirm_window_s),
         click_window_s=float(defaults.confirm_timeout_s),
     )
-    orchestrator = create_orchestrator(ui, registry, store, policy_config_model, grant_key, ui_client)
+    orchestrator = create_orchestrator(ui, registry, store, policy_config_model, grant_key, ui_client, egress_gate)
+
+    MODES = {
+        "Local Only": PrivacyMode.LOCAL_ONLY,
+        "Local + Connectors": PrivacyMode.LOCAL_PLUS_WEB,
+        "Cloud Assisted": PrivacyMode.CLOUD_ASSISTED,
+    }
 
     def get_current_privacy_mode() -> PrivacyMode:
-        return PrivacyMode.CLOUD_ASSISTED if ui.backend.privacyModeText == "Cloud Assisted" else PrivacyMode.LOCAL_ONLY
+        return MODES.get(ui.backend.privacyModeText, PrivacyMode.LOCAL_ONLY)
 
     turn_lock = asyncio.Lock()
     background_tasks: set[asyncio.Task[None]] = set()
@@ -301,18 +317,52 @@ def main() -> None:
 
     ui.backend.onboardingCompleted.connect(on_setup)
 
-    def on_privacy_toggle() -> None:
-        if ui.backend.privacyModeText == "Cloud Assisted":
-            ui.backend.privacyModeText = "Local Only"
-        else:
-            ui.backend.privacyModeText = "Cloud Assisted"
+    def set_privacy_mode(name: str) -> None:
+        if name not in MODES:
+            return
+        ui.backend.privacyModeText = name
+        egress_gate.current_mode = MODES[name]
 
-        orchestrator.egress_gate.current_mode = get_current_privacy_mode()  # type: ignore[attr-defined]
+    def on_privacy_toggle() -> None:
+        # Cycle Local Only -> Local + Connectors -> Cloud Assisted
+        names = list(MODES)
+        current = names.index(ui.backend.privacyModeText) if ui.backend.privacyModeText in names else 0
+        set_privacy_mode(names[(current + 1) % len(names)])
 
     ui.backend.privacyModeToggled.connect(on_privacy_toggle)
+    ui.backend.privacyModeSelected.connect(set_privacy_mode)
+
+    def refresh_models() -> None:
+        ui.connector_model.refresh()
+        ui.capability_model.refresh()
+
+    async def connect_connector(cid: str, params_json: str) -> None:
+        import json
+        from rei.connectors import ConnectorError
+        try:
+            params = json.loads(params_json) if params_json else {}
+            await asyncio.to_thread(connectors.connect, cid, {k: str(v) for k, v in params.items()})
+            ok, message = True, "Connected."
+        except ConnectorError as e:
+            ok, message = False, str(e)
+        except Exception as e:
+            ok, message = False, f"Couldn't connect: {e}"
+        refresh_models()
+        ui.backend.connectorResult.emit(cid, ok, message)
+
+    async def disconnect_connector(cid: str) -> None:
+        try:
+            await asyncio.to_thread(connectors.disconnect, cid)
+        except Exception as e:
+            print(f"[Connectors] disconnect failed: {e}")
+        refresh_models()
+        ui.backend.connectorResult.emit(cid, True, "Disconnected.")
+
+    ui.backend.connectRequested.connect(lambda cid, params: spawn(connect_connector(cid, params)))
+    ui.backend.disconnectRequested.connect(lambda cid: spawn(disconnect_connector(cid)))
 
     # Set initial egress gate mode
-    orchestrator.egress_gate.current_mode = get_current_privacy_mode()  # type: ignore[attr-defined]
+    egress_gate.current_mode = get_current_privacy_mode()
 
     def on_text_message(text: str) -> None:
         # Typing "yes" also answers a pending confirmation
