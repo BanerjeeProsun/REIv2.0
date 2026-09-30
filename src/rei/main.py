@@ -33,6 +33,13 @@ from rei.core.cancellation import CancelToken
 
 load_dotenv()
 
+# The Windows console defaults to a legacy code page; printing a transcript or
+# reply with characters outside it raised UnicodeEncodeError and silently
+# discarded the whole voice turn. Never let logging break the pipeline.
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 def create_orchestrator(ui: 'ReiUI', registry: Any, store: Any, policy_config_model: Any, grant_key: bytes) -> Orchestrator:
     policy_config = policy_config_model.model_dump()
     policy_engine = PolicyEngine(registry, policy_config, grant_key)
@@ -81,7 +88,10 @@ async def start_voice_loop(ui: 'ReiUI', aec: EchoCanceller, run_turn: Any) -> No
     try:
         capture = AudioCapture()
         vad = VoiceActivityDetector(threshold=3)
-        stt = SpeechToText()
+        # Whisper takes seconds to load; do it off the UI thread so the window
+        # stays responsive (typing works) while voice is still starting up.
+        ui.set_status("Loading voice...")
+        stt = await asyncio.get_running_loop().run_in_executor(None, SpeechToText)
     except Exception as e:
         ui.set_status(f"Voice Error: {e}")
         return

@@ -1,103 +1,68 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
+import ".."
+import "../components"
 
-Item {
-    id: root
+PageScaffold {
+    id: page
+    title: "Capabilities"
+    subtitle: "Everything Rei can do on this device, and how much trust each action needs."
 
-    readonly property color colorCarbonSurface: "#141516"
-    readonly property color colorGraphiteSurface: "#1c1c1f"
-    readonly property color colorAshBorder: "#34343a"
-    readonly property color colorSteelText: "#62666d"
-    readonly property color colorMistText: "#d0d6e0"
-    readonly property color colorSnow: "#f7f8f8"
-    readonly property color colorFogText: "#8a8f98"
-    readonly property string fontInter: "Inter Variable"
-    readonly property string fontMono: "Berkeley Mono"
+    function tierLabel(tier) {
+        return tier === "R0" ? "Read only"
+             : tier === "R1" ? "Low risk"
+             : tier === "R2" ? "Asks first"
+             : tier === "R3" ? "Needs review"
+             : "Restricted"
+    }
 
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 48
-        spacing: 24
+    // Two columns when there is room, one when the window is narrow
+    GridLayout {
+        Layout.fillWidth: true
+        columns: page.width > 900 ? 2 : 1
+        columnSpacing: Theme.s16
+        rowSpacing: Theme.s16
 
-        RowLayout {
-            Layout.fillWidth: true
-            Text {
-                text: "Capabilities Registry"
-                color: colorSnow
-                font.family: fontInter
-                font.pixelSize: 32
-                font.weight: 510
-font.letterSpacing: -0.416
-            }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true; height: 1; color: colorAshBorder
-        }
-
-        ListView {
-            id: capList
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            model: capabilityModel
-            spacing: 8
-            clip: true
-            
-            delegate: Rectangle {
-                width: capList.width
-                height: 72
-                radius: 4
-                color: "transparent"
-                border.color: colorAshBorder
-                border.width: 1
+        Repeater {
+            model: typeof capabilityModel !== "undefined" ? capabilityModel : 0
+            SurfaceCard {
+                hoverable: true
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1   // equal column widths
+                Layout.fillHeight: true
 
                 RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 16
-
-                    ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.s8
+                    Text {
                         Layout.fillWidth: true
-                        spacing: 4
-                        Text {
-                            text: id
-                            color: colorSnow
-                            font.family: fontMono
-                            font.pixelSize: 15
-                        }
-                        Text {
-                            text: summary
-                            color: colorMistText
-                            font.family: fontInter
-                            font.pixelSize: 14
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                        }
+                        text: model.summary
+                        color: Theme.textPrimary
+                        font.family: Theme.fontText
+                        font.pixelSize: Theme.sizeBody
+                        font.weight: Font.DemiBold
+                        wrapMode: Text.WordWrap
                     }
-
-                    // TIER BADGE
-                    Rectangle {
-                        width: 40; height: 24; radius: 4
-                        color: colorGraphiteSurface
-                        border.color: colorAshBorder
-                        Text { text: tier; color: colorFogText; anchors.centerIn: parent; font.family: fontInter; font.pixelSize: 12; font.weight: 510 }
+                }
+                Text {
+                    Layout.fillWidth: true
+                    text: model.id
+                    color: Theme.textMuted
+                    font.family: Theme.fontMono
+                    font.pixelSize: Theme.sizeCaption
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    spacing: Theme.s8
+                    Tag {
+                        text: page.tierLabel(model.tier)
+                        dot: true
+                        // Coral is reserved for the few high-risk actions
+                        dotColor: model.tier === "R3" || model.tier === "R4" ? Theme.coral : Theme.textSecondary
                     }
-
-                    // NETWORK BADGE
-                    Rectangle {
-                        width: 60; height: 24; radius: 4
-                        color: colorGraphiteSurface
-                        border.color: colorAshBorder
-                        Text { text: network ? "Network" : "Local"; color: network ? colorMistText : colorFogText; anchors.centerIn: parent; font.family: fontInter; font.pixelSize: 12 }
-                    }
-                    
-                    // TOGGLE (Coming Soon)
-                    Rectangle {
-                        width: 80; height: 24; radius: 12
-                        color: "transparent"; border.color: colorAshBorder
-                        Text { text: "Coming Soon"; color: colorSteelText; anchors.centerIn: parent; font.family: fontInter; font.pixelSize: 11 }
-                    }
+                    Tag { text: model.network ? "Uses network" : "On-device" }
+                    Item { Layout.fillWidth: true }
                 }
             }
         }

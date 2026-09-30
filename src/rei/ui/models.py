@@ -34,7 +34,7 @@ class MemoryModel(QAbstractListModel):
         if role == self.IdRole:
             return mem["id"]
         elif role == self.ContentRole:
-            return str(mem["content"])
+            return self._readable(mem["content"])
         elif role == self.KindRole:
             return mem["kind"]
         elif role == self.DataClassRole:
@@ -42,6 +42,15 @@ class MemoryModel(QAbstractListModel):
         elif role == self.CreatedAtRole:
             return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(mem["created_at"]))
         return None
+
+    @staticmethod
+    def _readable(content: Any) -> str:
+        """Show {"name": "Ada", "purpose": "research"} as "Name: Ada · Purpose: research"."""
+        if isinstance(content, dict):
+            return "  ·  ".join(f"{str(k).replace('_', ' ').capitalize()}: {v}" for k, v in content.items())
+        if isinstance(content, list):
+            return ", ".join(str(v) for v in content)
+        return str(content)
 
     @Slot()
     def refresh(self):

@@ -33,7 +33,21 @@ class ReiBackend(QObject):
     onboardingCompleted = Signal(str, str)
     @Slot(str, str)
     def completeOnboarding(self, name: str, purpose: str):
+        self.userName = name
         self.onboardingCompleted.emit(name, purpose)
+
+    userNameChanged = Signal()
+    @Property(str, notify=userNameChanged)
+    def userName(self):
+        """First name for the home greeting ("Good evening, Ada.")."""
+        return getattr(self, '_user_name', "")
+
+    @userName.setter
+    def userName(self, val):
+        first = (val or "").strip().split(" ")[0]
+        if getattr(self, '_user_name', "") != first:
+            self._user_name = first
+            self.userNameChanged.emit()
 
     needsSetupChanged = Signal()
     @Property(bool, notify=needsSetupChanged)
@@ -108,20 +122,27 @@ class ReiUI:
     def __init__(self) -> None:
         self.backend = ReiBackend()
         self.mic_active = False
+        # The native Windows style can't be themed (e.g. scrollbars); Basic can,
+        # and every control is restyled by our own components anyway.
+        from PySide6.QtQuickControls2 import QQuickStyle
+        QQuickStyle.setStyle("Basic")
         self.engine = QQmlApplicationEngine()
         
         # Expose backend to QML
         self.engine.rootContext().setContextProperty("backend", self.backend)
-        
+        self._loaded = False
+
+    def _load(self) -> None:
+        """Load the QML once, after the data models are exposed, so pages never
+        start with undefined memoryModel/capabilityModel references."""
+        if self._loaded:
+            return
+        self._loaded = True
         qml_file = Path(__file__).parent / "qml" / "Main.qml"
         self.engine.load(str(qml_file))
-        
         if not self.engine.rootObjects():
             print("CRITICAL: Failed to load QML UI.")
             sys.exit(-1)
-            
-        # Initial greeting
-        self.backend.messageAdded.emit("Hello! I am Rei. I am running entirely locally on your hardware. How can I assist you today?", False)
 
     def set_context(self, store, registry, policy_config):
         from rei.ui.models import MemoryModel, CapabilityModel
@@ -139,10 +160,15 @@ class ReiUI:
         profile = store.read("user_profile")
         if not profile:
             self.backend.needsSetup = True
+        elif isinstance(profile, dict):
+            self.backend.userName = str(profile.get("name", ""))
+
+        self._load()
 
     def show(self) -> None:
-        # QML Windows handle their own visibility (visible: true)
-        pass
+        # QML Windows handle their own visibility (visible: true); make sure the
+        # QML is loaded even if set_context() was never called.
+        self._load()
 
     STATE_TEXT = {
         "idle": "How can I help you?",

@@ -1,111 +1,53 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
+import ".."
+import "../components"
 
-Item {
-    id: root
+PageScaffold {
+    id: page
+    title: "Settings"
+    subtitle: "Control what Rei can see, where it thinks, and how it sounds."
 
-    readonly property color colorCarbonSurface: "#141516"
-    readonly property color colorAshBorder: "#34343a"
-    readonly property color colorSteelText: "#62666d"
-    readonly property color colorMistText: "#d0d6e0"
-    readonly property color colorSnow: "#f7f8f8"
-    readonly property color colorFogText: "#8a8f98"
-    readonly property string fontInter: "Inter Variable"
+    readonly property bool cloud: backend.privacyModeText === "Cloud Assisted"
 
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 48
-        spacing: 24
+    SectionLabel { text: "Privacy" }
 
-        Text {
-            text: "Settings"
-            color: colorSnow
-            font.family: fontInter
-            font.pixelSize: 32
-            font.weight: 510
-font.letterSpacing: -0.416
+    SettingRow {
+        title: page.cloud ? "Cloud Assisted" : "Local Only"
+        description: page.cloud
+            ? "Complex requests use the cloud planner. Names, emails and secrets are replaced on-device before anything is sent."
+            : "Everything runs on this device. Nothing you say or type leaves your computer."
+        iconSource: Qt.resolvedUrl(page.cloud ? "../icons/cloud.svg" : "../icons/local.svg")
+
+        SegmentedControl {
+            options: ["Local only", "Cloud assisted"]
+            currentIndex: page.cloud ? 1 : 0
+            onSelected: backend.togglePrivacyMode()
         }
+    }
 
-        Rectangle { Layout.fillWidth: true; height: 1; color: colorAshBorder }
+    SectionLabel { text: "Voice" }
 
-        ScrollView {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
+    SettingRow {
+        title: "Speech recognition"
+        description: "Whisper (base), English, running on-device."
+        iconSource: Qt.resolvedUrl("../icons/mic.svg")
+        Tag { text: backend.state === "idle" ? "Mic off" : "Mic live"; dot: true; dotColor: backend.state === "idle" ? Theme.textMuted : Theme.coral }
+    }
 
-            ColumnLayout {
-                width: parent.width
-                spacing: 32
+    SettingRow {
+        title: "Voice output"
+        description: "Kokoro neural voice, synthesised locally."
+        iconSource: Qt.resolvedUrl("../icons/chat.svg")
+        Tag { text: "On-device" }
+    }
 
-                // PRIVACY MODE SECTION
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 16
+    SectionLabel { text: "Models" }
 
-                    Text { text: "Privacy Mode"; color: colorSnow; font.family: fontInter; font.pixelSize: 15; font.weight: 510 }
-                    
-                    Rectangle {
-                        Layout.fillWidth: true; height: 80; radius: 8
-                        color: colorCarbonSurface; border.color: colorAshBorder
-                        
-                        RowLayout {
-                            anchors.fill: parent; anchors.margins: 16; spacing: 16
-                            
-                            Image {
-                                source: backend.privacyModeText === "Cloud Assisted" ? "../icons/cloud.svg" : "../icons/local.svg"
-                                sourceSize.width: 24; sourceSize.height: 24
-                                Layout.preferredWidth: 24; Layout.preferredHeight: 24
-                            }
-
-                            ColumnLayout {
-                                Layout.fillWidth: true; spacing: 4
-                                Text { text: backend.privacyModeText; color: colorSnow; font.family: fontInter; font.pixelSize: 15 }
-                                Text { text: "Active privacy boundary routing policy."; color: colorMistText; font.family: fontInter; font.pixelSize: 14 }
-                            }
-
-                            Rectangle {
-                                width: 80; height: 32; radius: 16
-                                color: "transparent"; border.color: colorAshBorder; border.width: 1
-                                Text { text: "Switch"; color: colorSnow; anchors.centerIn: parent; font.family: fontInter; font.pixelSize: 13; font.weight: 510 }
-                                MouseArea {
-                                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                    onClicked: backend.togglePrivacyMode()
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // MODELS SECTION (Coming Soon)
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 16
-
-                    Text { text: "Models Configuration"; color: colorSnow; font.family: fontInter; font.pixelSize: 15; font.weight: 510 }
-                    
-                    Rectangle {
-                        Layout.fillWidth: true; height: 80; radius: 8
-                        color: colorCarbonSurface; border.color: colorAshBorder
-                        
-                        RowLayout {
-                            anchors.fill: parent; anchors.margins: 16; spacing: 16
-                            
-                            ColumnLayout {
-                                Layout.fillWidth: true; spacing: 4
-                                Text { text: "LLM Backend"; color: colorSnow; font.family: fontInter; font.pixelSize: 15 }
-                                Text { text: "Dynamic model unloading and hardware acceleration settings."; color: colorMistText; font.family: fontInter; font.pixelSize: 14 }
-                            }
-
-                            Rectangle {
-                                width: 100; height: 28; radius: 14
-                                color: "transparent"; border.color: colorAshBorder
-                                Text { text: "Coming Soon"; color: colorSteelText; anchors.centerIn: parent; font.family: fontInter; font.pixelSize: 12 }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    SettingRow {
+        title: "LLM backend"
+        description: "Dynamic model unloading and hardware acceleration settings."
+        iconSource: Qt.resolvedUrl("../icons/capabilities.svg")
+        Tag { text: "Coming soon" }
     }
 }
