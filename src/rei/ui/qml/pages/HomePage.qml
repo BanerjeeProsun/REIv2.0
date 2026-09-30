@@ -21,11 +21,61 @@ Item {
         anchors.margins: 48
         spacing: 24
 
-        // RE-INTEGRATED ORB / STATUS AREA
+        // ORB / STATUS AREA
+        // The orb is always animated: it breathes at rest, pulses while
+        // thinking, and follows live amplitude (mic when listening, Rei's own
+        // voice when speaking), with a synthetic pulse if no amplitude exists.
         Item {
+            id: orb
             Layout.alignment: Qt.AlignHCenter
             width: 160
             height: 160
+
+            readonly property string st: backend.state
+            property real level: Math.max(st === "listening" ? backend.volume : 0, backend.outputLevel)
+            Behavior on level { NumberAnimation { duration: 80 } }
+
+            property real breath: 0
+            SequentialAnimation on breath {
+                loops: Animation.Infinite
+                NumberAnimation { from: 0; to: 1; duration: 1600; easing.type: Easing.InOutSine }
+                NumberAnimation { from: 1; to: 0; duration: 1600; easing.type: Easing.InOutSine }
+            }
+
+            property real pulse: 0
+            SequentialAnimation on pulse {
+                running: orb.st === "speaking" || orb.st === "processing"
+                loops: Animation.Infinite
+                NumberAnimation { from: 0.0; to: 1.0; duration: 400; easing.type: Easing.InOutQuad }
+                NumberAnimation { from: 1.0; to: 0.4; duration: 300; easing.type: Easing.InOutQuad }
+                NumberAnimation { from: 0.4; to: 0.9; duration: 500; easing.type: Easing.InOutQuad }
+                NumberAnimation { from: 0.9; to: 0.0; duration: 400; easing.type: Easing.InOutQuad }
+            }
+
+            readonly property real energy: st === "speaking" ? Math.max(level, pulse * 0.6)
+                                         : st === "processing" ? pulse * 0.3
+                                         : st === "listening" ? Math.max(level, 0.15 * breath)
+                                         : 0.12 * breath
+
+            // Outer glow
+            Rectangle {
+                anchors.centerIn: parent
+                width: 100; height: 100
+                radius: 50
+                color: Qt.rgba(229/255, 192/255, 123/255, 0.05 + 0.22 * orb.energy)
+                scale: 1.0 + 0.05 * orb.breath + 0.45 * orb.energy
+                Behavior on scale { NumberAnimation { duration: 90 } }
+            }
+
+            // Inner glow
+            Rectangle {
+                anchors.centerIn: parent
+                width: 100; height: 100
+                radius: 50
+                color: Qt.rgba(247/255, 248/255, 248/255, 0.04 + 0.14 * orb.energy)
+                scale: 0.85 + 0.12 * orb.energy
+                Behavior on scale { NumberAnimation { duration: 90 } }
+            }
 
             // Base circle
             Rectangle {
@@ -33,13 +83,14 @@ Item {
                 width: 100; height: 100
                 radius: 50
                 color: "transparent"
-                border.color: backend.state === "processing" ? Qt.rgba(247/255, 248/255, 248/255, 0.2) : colorSnow
+                border.color: orb.st === "processing" ? Qt.rgba(247/255, 248/255, 248/255, 0.2) : colorSnow
                 border.width: 1
+                scale: 1.0 + 0.02 * orb.breath
             }
 
             // Listening Rings
             Repeater {
-                model: backend.state === "listening" ? 2 : 0
+                model: orb.st === "listening" ? 2 : 0
                 Rectangle {
                     anchors.centerIn: parent
                     width: 100; height: 100
@@ -47,15 +98,16 @@ Item {
                     color: "transparent"
                     border.color: colorSnow
                     border.width: 1
-                    SequentialAnimation on scale { loops: Animation.Infinite; NumberAnimation { from: 1.0; to: 1.8; duration: 2000 } }
-                    SequentialAnimation on opacity { loops: Animation.Infinite; NumberAnimation { from: 0.3; to: 0.0; duration: 2000 } }
+                    SequentialAnimation on scale { loops: Animation.Infinite; PauseAnimation { duration: index * 1000 } NumberAnimation { from: 1.0; to: 1.8; duration: 2000 } }
+                    SequentialAnimation on opacity { loops: Animation.Infinite; PauseAnimation { duration: index * 1000 } NumberAnimation { from: 0.3; to: 0.0; duration: 2000 } }
                 }
             }
 
             // Processing Arc
             Canvas {
                 anchors.fill: parent
-                visible: backend.state === "processing"
+                visible: orb.st === "processing"
+                onVisibleChanged: if (visible) requestPaint()
                 onPaint: {
                     var ctx = getContext("2d");
                     ctx.clearRect(0, 0, width, height);
@@ -65,26 +117,7 @@ Item {
                     ctx.lineWidth = 1.5;
                     ctx.stroke();
                 }
-                RotationAnimation on rotation { from: 0; to: 360; duration: 1200; loops: Animation.Infinite; running: backend.state === "processing" }
-            }
-
-            // Speaking Glow (Simulated Pulse)
-            Rectangle {
-                anchors.centerIn: parent
-                width: 100
-                height: 100
-                radius: width/2
-                color: Qt.rgba(247/255, 248/255, 248/255, 0.25)
-                visible: backend.state === "speaking"
-                
-                SequentialAnimation on scale {
-                    running: backend.state === "speaking"
-                    loops: Animation.Infinite
-                    NumberAnimation { from: 1.0; to: 1.3; duration: 400; easing.type: Easing.InOutQuad }
-                    NumberAnimation { from: 1.3; to: 1.1; duration: 300; easing.type: Easing.InOutQuad }
-                    NumberAnimation { from: 1.1; to: 1.4; duration: 500; easing.type: Easing.InOutQuad }
-                    NumberAnimation { from: 1.4; to: 1.0; duration: 400; easing.type: Easing.InOutQuad }
-                }
+                RotationAnimation on rotation { from: 0; to: 360; duration: 1200; loops: Animation.Infinite; running: orb.st === "processing" }
             }
         }
 

@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QApplication
 class ReiBackend(QObject):
     statusChanged = Signal()
     volumeChanged = Signal()
+    outputLevelChanged = Signal()
     stateChanged = Signal()
     messageAdded = Signal(str, bool)
     confirmationRequested = Signal(str, str, str) # title, message, intent_id
@@ -16,6 +17,7 @@ class ReiBackend(QObject):
         super().__init__()
         self._status = "How can I help you?"
         self._volume = 0.0
+        self._output_level = 0.0
         self._state = "idle"
         self.response_callback = None
 
@@ -63,6 +65,17 @@ class ReiBackend(QObject):
             self._volume = val
             self.volumeChanged.emit()
 
+    @Property(float, notify=outputLevelChanged)
+    def outputLevel(self):
+        """Amplitude (0..1) of Rei's own speech, for the orb animation."""
+        return self._output_level
+
+    @outputLevel.setter
+    def outputLevel(self, val):
+        if self._output_level != val:
+            self._output_level = val
+            self.outputLevelChanged.emit()
+
     @Property(str, notify=stateChanged)
     def state(self):
         return self._state
@@ -94,6 +107,7 @@ class ReiUI:
     """QML-based implementation of the UI Reference."""
     def __init__(self) -> None:
         self.backend = ReiBackend()
+        self.mic_active = False
         self.engine = QQmlApplicationEngine()
         
         # Expose backend to QML
@@ -130,29 +144,39 @@ class ReiUI:
         # QML Windows handle their own visibility (visible: true)
         pass
 
+    STATE_TEXT = {
+        "idle": "How can I help you?",
+        "listening": "Listening...",
+        "processing": "Thinking...",
+        "speaking": "Speaking...",
+    }
+
+    def set_state(self, state: str, status: str | None = None) -> None:
+        """Explicit UI state. Never inferred from message text."""
+        if state not in self.STATE_TEXT:
+            raise ValueError(f"Unknown UI state: {state}")
+        # Status first, so bindings on stateChanged already see matching text
+        self.backend.status = status or self.STATE_TEXT[state]
+        self.backend.state = state
+
+    def set_rest_state(self) -> None:
+        """Where the UI settles between turns: listening if the mic is live."""
+        self.set_state("listening" if self.mic_active else "idle")
+
+    def add_message(self, text: str, is_user: bool) -> None:
+        if text.strip():
+            self.backend.messageAdded.emit(text, is_user)
+
     def set_status(self, status: str) -> None:
-        if "Heard: " in status:
-            msg = status.replace("Heard: ", "")
-            self.backend.messageAdded.emit(msg, True)
-            self.backend.state = "processing"
-            self.backend.status = "Thinking..."
-        elif "Listening" in status:
-            self.backend.state = "listening"
-            self.backend.status = "Listening..."
-        elif "Transcribing" in status or "Routing" in status:
-            self.backend.state = "processing"
-            self.backend.status = "Thinking..."
-        elif "Speaking" in status:
-            self.backend.state = "speaking"
-            self.backend.status = "Speaking..."
-            msg = status.replace("Speaking: ", "")
-            self.backend.messageAdded.emit(msg, False)
-        else:
-            self.backend.state = "idle"
-            self.backend.status = "How can I help you?"
-            
+        """Free-form status line (e.g. errors) without changing the state."""
+        self.backend.status = status
+
     def update_volume(self, vol: float) -> None:
-        self.backend.volume = min(1.0, vol * 5.0)
+        # Fast attack, slow decay so the listening glow doesn't flicker
+        self.backend.volume = min(1.0, max(vol * 5.0, self.backend.volume * 0.85))
+
+    def update_output_level(self, level: float) -> None:
+        self.backend.outputLevel = max(0.0, min(1.0, level))
 
     def close(self):
         QApplication.quit()
