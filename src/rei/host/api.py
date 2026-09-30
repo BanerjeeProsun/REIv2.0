@@ -16,7 +16,8 @@ class APIHardeningMiddleware:
             raise UnauthorizedError("Invalid launch token")
             
         # API-02: Must verify Host == localhost
-        if host_header not in ("localhost", "127.0.0.1"):
+        host = host_header.split(":")[0].strip("[]")
+        if host not in ("localhost", "127.0.0.1", "::1"):
             raise UnauthorizedError("Invalid Host header")
             
         # API-05: Enforce body limits

@@ -21,12 +21,6 @@ class PipelineError(Exception):
     pass
 
 
-class PipelineDenied(PipelineError):
-    def __init__(self, reason: str, decision: PolicyDecision | None = None) -> None:
-        super().__init__(reason)
-        self.reason = reason
-        self.decision = decision
-
 
 @dataclass
 class TurnResult:
@@ -184,6 +178,10 @@ class Orchestrator:
         return raw_input.strip()
 
     async def _propose(self, utterance: str, cancel_token: CancelToken) -> str:
+        # Utilize the Local model as an Anonymizer / Formatter before Cloud
+        if hasattr(self.model, "format_intent"):
+            utterance = await getattr(self.model, "format_intent")(utterance, cancel_token)
+
         specs = self.registry.get_all_specs()
         prompt = self.prompt_builder.build(utterance, specs)
         return await self.model.generate(prompt, cancel_token)
@@ -232,23 +230,32 @@ class Orchestrator:
         results: list[dict[str, Any]],
     ) -> str:
         parts: list[str] = []
+        result_iter = iter(results)
         for intent, decision in zip(intents, decisions):
             if decision.verdict == Verdict.DENY:
                 reason = ", ".join(decision.reasons)
                 parts.append(f"Could not execute {intent.capability}: {reason}")
-            elif decision.verdict == Verdict.CONFIRM:
-                parts.append(f"Awaiting confirmation for {intent.capability}")
             else:
-                parts.append(f"Done: {intent.rationale}")
+                # Intent was either ALLOW or CONFIRM (and approved) — check execution result
+                result = next(result_iter, None)
+                if result and result.get("status") == "success":
+                    parts.append(f"Done: {intent.rationale}")
+                elif result:
+                    parts.append(f"Failed: {intent.capability}")
+                else:
+                    parts.append(f"Skipped: {intent.capability}")
 
         return "; ".join(parts) if parts else "No actions were taken."
 
     def _extract_reply(self, raw_output: str) -> str:
         import json
+        text = raw_output.strip()
         try:
-            data = json.loads(raw_output)
+            data = json.loads(text)
             if isinstance(data, dict):
                 return str(data.get("reply", "I'm not sure how to help with that."))
         except (json.JSONDecodeError, ValueError):
-            pass
+            # If it's clearly not JSON but has some length, just return the text
+            if len(text) > 0 and not text.startswith("{") and not text.startswith("["):
+                return text
         return "I'm not sure how to help with that."

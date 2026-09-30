@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch
 from rei.core.executor import Executor, ExecutorError
 from rei.host.verify import GrantVerifier
 from rei.policy.engine import PolicyEngine
@@ -24,7 +25,13 @@ def executor(registry: CapabilityRegistry) -> Executor:
     verifier = GrantVerifier(registry, b"test_key")
     return Executor(registry, verifier)
 
-def test_executor_valid_grant(engine: PolicyEngine, executor: Executor) -> None:
+@patch("rei.capabilities.builtin.media.AudioUtilities", create=True)
+@patch("rei.capabilities.builtin.media.cast", create=True)
+def test_executor_valid_grant(mock_cast, mock_audio, engine: PolicyEngine, executor: Executor) -> None:
+    # Mock pycaw so we don't change real system volume
+    mock_volume = mock_cast.return_value
+    mock_volume.SetMasterVolumeLevelScalar = lambda *a: None
+
     intent = IntentProposal(
         type="intent", capability="media.set_volume", capability_version=1,
         args={"level": 50}, rationale=""

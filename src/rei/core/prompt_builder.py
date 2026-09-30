@@ -36,10 +36,13 @@ class PromptBuilder:
         cap_block = self._format_capabilities(capabilities)
         memory_block = ""
         if self.store:
-            memories = self.store.get_all()
-            if memories:
-                import json
-                memory_block = f"Long-term Memories:\n{json.dumps(memories, indent=2)}\n\n"
+            try:
+                memories = self.store.list_all()
+                if memories:
+                    import json
+                    memory_block = f"Long-term Memories:\n{json.dumps(memories, indent=2)}\n\n"
+            except AttributeError:
+                pass
         
         return (
             f"{self.SYSTEM_PREFIX}\n"

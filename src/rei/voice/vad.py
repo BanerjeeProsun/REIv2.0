@@ -1,19 +1,19 @@
 import numpy as np
-import webrtcvad # type: ignore
-from pathlib import Path
+import webrtcvad  # type: ignore
+
 
 class VADError(Exception):
     pass
 
+
 class VoiceActivityDetector:
     """WebRTC VAD wrapper for precise voice detection (VOI-01)."""
 
-    def __init__(self, model_path: Path | None = None, threshold: float = 3, sample_rate: int = 16000) -> None:
+    def __init__(self, threshold: int = 3, sample_rate: int = 16000) -> None:
         self.sample_rate = sample_rate
         # Ensure threshold is 0, 1, 2, or 3 for WebRTC
         level = max(0, min(3, int(round(threshold))))
         self.vad = webrtcvad.Vad(level)
-        self._last_prob = 0.0 # dummy for debug prints
         
     def reset(self) -> None:
         pass

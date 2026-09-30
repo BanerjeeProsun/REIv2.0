@@ -72,3 +72,28 @@ class MemoryStore:
             decrypted = self._decrypt(row[0])
             return json.loads(decrypted)
         return None
+
+    def list_all(self) -> list[dict[str, Any]]:
+        cursor = self.conn.execute('''
+            SELECT id, content, kind, data_class, origin, source_turn, tainted, created_at, expires_at 
+            FROM memory WHERE deleted_at IS NULL ORDER BY created_at DESC
+        ''')
+        results = []
+        for row in cursor.fetchall():
+            try:
+                decrypted = self._decrypt(row[1])
+                content = json.loads(decrypted)
+            except Exception:
+                content = "<Encrypted/Corrupt>"
+            results.append({
+                "id": row[0],
+                "content": content,
+                "kind": row[2],
+                "data_class": row[3],
+                "origin": row[4],
+                "source_turn": row[5],
+                "tainted": bool(row[6]),
+                "created_at": row[7],
+                "expires_at": row[8],
+            })
+        return results

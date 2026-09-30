@@ -57,8 +57,9 @@ class GrantVerifier:
         if spec.tier.value != token.tier:
             raise GrantVerificationError("Capability tier mismatch")
             
-        # Consume the nonce (in a real system, use an LRU cache)
+        # Consume the nonce
         self.consumed_nonces.add(token.nonce)
         if len(self.consumed_nonces) > 10000:
-            # Simple bounded cache
-            self.consumed_nonces.clear()
+            # Evict oldest half rather than clearing all (prevents replay window)
+            to_keep = list(self.consumed_nonces)[len(self.consumed_nonces) // 2:]
+            self.consumed_nonces = set(to_keep)

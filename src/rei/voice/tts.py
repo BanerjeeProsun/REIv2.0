@@ -15,7 +15,6 @@ class TextToSpeech:
         self.model_path = model_path
         self.voice = voice
         self.sample_rate = sample_rate
-        self.stream: sd.OutputStream | None = None
         self._playback_task: asyncio.Future[Any] | None = None
         
         self.kokoro = None
@@ -69,11 +68,6 @@ class TextToSpeech:
     async def _play_audio(self, audio: np.ndarray, cancel_token: CancelToken) -> None:
         """Plays audio using sounddevice, allowing barge-in cancellation."""
         loop = asyncio.get_running_loop()
-        
-        def _callback(outdata: np.ndarray, frames: int, time: dict[str, Any], status: sd.CallbackFlags) -> None:
-            if status:
-                print(f"TTS playback warning: {status}")
-            pass
 
         def _play_sync() -> None:
             sd.play(audio, self.sample_rate)

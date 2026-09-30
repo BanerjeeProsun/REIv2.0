@@ -1,5 +1,6 @@
 import pytest
 import secrets
+from unittest.mock import patch, MagicMock
 from rei.core.orchestrator import Orchestrator
 from rei.core.cancellation import CancelToken
 from rei.core.prompt_builder import PromptBuilder
@@ -51,7 +52,8 @@ def _build_ctx() -> PolicyContext:
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_open_notepad() -> None:
+@patch("subprocess.Popen", return_value=MagicMock())
+async def test_orchestrator_open_notepad(mock_popen: MagicMock) -> None:
     orch = _build_orchestrator()
     ctx = _build_ctx()
     token = CancelToken()
@@ -64,6 +66,7 @@ async def test_orchestrator_open_notepad() -> None:
     assert len(result.decisions) == 1
     assert result.decisions[0].verdict.name == "ALLOW"
     assert len(result.execution_results) >= 1
+    mock_popen.assert_called_once()
 
 
 @pytest.mark.asyncio

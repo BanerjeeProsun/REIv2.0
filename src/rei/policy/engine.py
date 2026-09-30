@@ -11,8 +11,6 @@ from rei.policy.grant import GrantToken
 from rei.capabilities.registry import CapabilityRegistry, UnknownCapabilityError
 from rei.capabilities.spec import RiskTier
 
-class PolicyEngineError(Exception):
-    pass
 
 class PolicyEngine:
     def __init__(self, registry: CapabilityRegistry, config: dict[str, Any], grant_key: bytes) -> None:
@@ -20,6 +18,21 @@ class PolicyEngine:
         self.config = config
         self.grant_key = grant_key
         self.policy_version = config.get("version", "unknown")
+        
+        self._usage: dict[str, list[float]] = {}
+        self._parsed_rate_limits: dict[str, tuple[int, int]] = {}
+        self._parse_config_rate_limits()
+
+    def _parse_config_rate_limits(self) -> None:
+        rl_conf = self.config.get("rate_limits", {})
+        for cap, val in rl_conf.items():
+            try:
+                limit_str, period_str = val.split("/")
+                limit = int(limit_str)
+                period_s = 60 if period_str == "min" else 3600 if period_str == "hour" else 1
+                self._parsed_rate_limits[cap] = (limit, period_s)
+            except Exception:
+                pass
 
     def decide(self, intent: IntentProposal, ctx: PolicyContext) -> PolicyDecision:
         try:
@@ -66,9 +79,19 @@ class PolicyEngine:
                     return self._deny("EGRESS_BLOCKED_LOCAL_ONLY")
                     
             # 6. Rate limits
-            # Rate limit mock logic
-            limit = spec.rate_limit
-            if limit and limit.limit < 1: # simplistic
+            now = time.time()
+            if intent.capability in self._parsed_rate_limits:
+                limit, period_s = self._parsed_rate_limits[intent.capability]
+            elif spec.rate_limit:
+                limit, period_s = spec.rate_limit.limit, spec.rate_limit.period_s
+            else:
+                limit, period_s = 9999, 1
+                
+            history = self._usage.get(intent.capability, [])
+            history = [t for t in history if now - t < period_s]
+            self._usage[intent.capability] = history
+            
+            if len(history) >= limit:
                 return self._deny("RATE_LIMITED")
                 
             # 7 & 8 & 9. Base tier, Escalation, Pre-authorisation
@@ -106,6 +129,10 @@ class PolicyEngine:
     def issue_grant(
         self, intent: IntentProposal, ctx: PolicyContext, decision: PolicyDecision
     ) -> tuple[GrantToken, str]:
+        # Record usage for rate limiting
+        history = self._usage.setdefault(intent.capability, [])
+        history.append(time.time())
+        
         # Single-use bound token
         spec = self.registry.get_spec(intent.capability)
         

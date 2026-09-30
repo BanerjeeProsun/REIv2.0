@@ -45,7 +45,6 @@ class VoiceLoop:
         
         print("Voice loop started. Listening...")
         
-        chunk_count = 0
         while self._running:
             try:
                 # Get raw audio chunk from microphone
@@ -54,7 +53,6 @@ class VoiceLoop:
                 vol = float(np.max(np.abs(chunk)))
                 self.on_volume(vol)
                 
-                chunk_count += 1
                 # Check AEC to avoid transcribing our own TTS
                 if self.aec.should_suppress():
                     self._reset_vad()

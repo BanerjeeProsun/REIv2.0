@@ -50,11 +50,21 @@ class LocalPlanner(ModelAdapter):
             )
             return output["choices"][0]["text"].strip() # type: ignore
             
+        def _extract_json(content: str) -> str:
+            if "```json" in content:
+                content = content.split("```json")[1]
+                if "```" in content:
+                    content = content.split("```")[0]
+            elif "```" in content:
+                content = content.split("```")[1]
+                if "```" in content:
+                    content = content.split("```")[0]
+            return content.strip()
+            
         try:
-            # TODO: apply deadline_ms via asyncio.wait_for
             text = await loop.run_in_executor(None, _generate_sync)
             cancel_token.raise_if_cancelled()
-            return text
+            return _extract_json(text)
         except asyncio.CancelledError:
             raise
         except Exception as e:

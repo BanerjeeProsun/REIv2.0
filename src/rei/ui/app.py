@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from PySide6.QtCore import QObject, Signal, Slot, Property
+from PySide6.QtCore import QObject, Signal, Property, Slot
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtWidgets import QApplication
 
@@ -9,12 +9,39 @@ class ReiBackend(QObject):
     volumeChanged = Signal()
     stateChanged = Signal()
     messageAdded = Signal(str, bool)
+    confirmationRequested = Signal(str, str, str) # title, message, intent_id
+    textMessageReceived = Signal(str)
 
     def __init__(self):
         super().__init__()
         self._status = "How can I help you?"
         self._volume = 0.0
         self._state = "idle"
+        self.response_callback = None
+
+    @Slot(str, bool)
+    def sendConfirmationResponse(self, intent_id: str, approved: bool):
+        if self.response_callback:
+            self.response_callback(intent_id, approved)
+
+    @Slot(str)
+    def sendTextMessage(self, text: str):
+        self.textMessageReceived.emit(text)
+
+    onboardingCompleted = Signal(str, str)
+    @Slot(str, str)
+    def completeOnboarding(self, name: str, purpose: str):
+        self.onboardingCompleted.emit(name, purpose)
+
+    needsSetupChanged = Signal()
+    @Property(bool, notify=needsSetupChanged)
+    def needsSetup(self):
+        return getattr(self, '_needs_setup', False)
+
+    @needsSetup.setter
+    def needsSetup(self, val):
+        self._needs_setup = val
+        self.needsSetupChanged.emit()
 
     @Property(str, notify=statusChanged)
     def status(self):
@@ -46,6 +73,22 @@ class ReiBackend(QObject):
             self._state = val
             self.stateChanged.emit()
 
+    privacyModeChanged = Signal()
+    privacyModeToggled = Signal()
+
+    @Slot()
+    def togglePrivacyMode(self):
+        self.privacyModeToggled.emit()
+
+    @Property(str, notify=privacyModeChanged)
+    def privacyModeText(self):
+        return getattr(self, '_privacy_mode', "Local Only")
+
+    @privacyModeText.setter
+    def privacyModeText(self, val):
+        self._privacy_mode = val
+        self.privacyModeChanged.emit()
+
 
 class ReiUI:
     """QML-based implementation of the UI Reference."""
@@ -56,7 +99,7 @@ class ReiUI:
         # Expose backend to QML
         self.engine.rootContext().setContextProperty("backend", self.backend)
         
-        qml_file = Path(__file__).parent / "main.qml"
+        qml_file = Path(__file__).parent / "qml" / "Main.qml"
         self.engine.load(str(qml_file))
         
         if not self.engine.rootObjects():
@@ -65,6 +108,23 @@ class ReiUI:
             
         # Initial greeting
         self.backend.messageAdded.emit("Hello! I am Rei. I am running entirely locally on your hardware. How can I assist you today?", False)
+
+    def set_context(self, store, registry, policy_config):
+        from rei.ui.models import MemoryModel, CapabilityModel
+        self.memory_model = MemoryModel(store)
+        self.capability_model = CapabilityModel(registry)
+        
+        self.engine.rootContext().setContextProperty("memoryModel", self.memory_model)
+        self.engine.rootContext().setContextProperty("capabilityModel", self.capability_model)
+        
+        # Determine privacy mode
+        mode = policy_config.get("defaults", {}).get("privacy_mode", "local_only")
+        self.backend.privacyModeText = "Cloud Assisted" if mode == "cloud_assisted" else "Local Only"
+
+        # Check if onboarding is needed
+        profile = store.read("user_profile")
+        if not profile:
+            self.backend.needsSetup = True
 
     def show(self) -> None:
         # QML Windows handle their own visibility (visible: true)
