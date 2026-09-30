@@ -16,6 +16,7 @@ forbidden_modules =
     aiohttp
 ignore_imports =
     rei.models.nim_planner -> httpx
+    rei.egress.gate -> httpx
     rei.capabilities.builtin.files -> httpx
 
 [importlinter:contract:no-subprocess]

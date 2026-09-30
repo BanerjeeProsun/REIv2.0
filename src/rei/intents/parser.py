@@ -41,7 +41,7 @@ class IntentParser:
                 
             intents = []
             for item in parsed_json:
-                if item.get("type") != "intent":
+                if not isinstance(item, dict) or item.get("type") != "intent":
                     continue
                 try:
                     proposal = IntentProposal.model_validate(item)

@@ -1,4 +1,5 @@
 import asyncio
+import re
 from typing import Any
 from dataclasses import dataclass
 
@@ -11,6 +12,9 @@ from rei.policy.grant import GrantToken
 from rei.core.cancellation import CancelToken
 from rei.core.prompt_builder import PromptBuilder
 from rei.models.adapter import ModelAdapter
+from rei.models.router import ModelRouter, Route
+from rei.models.formatter import FormatterError
+from rei.egress.anonymizer import Anonymizer, Vault
 from rei.capabilities.registry import CapabilityRegistry
 from rei.confirm.broker import ConfirmationBroker
 from rei.core.executor import Executor
@@ -73,11 +77,28 @@ class Orchestrator:
 
             # 2. Propose
             cancel_token.raise_if_cancelled()
-            raw_output = await self._propose(utterance, cancel_token)
+            raw_output, vault = await self._propose(utterance, ctx, cancel_token, audit_events)
             audit_events.append({"stage": "propose", "output_len": len(raw_output)})
 
             # 3. Parse
             intents = self._parse(raw_output)
+            if self._planned_by_small_model(vault):
+                grounded = self._ground_intents(intents, utterance)
+                if len(grounded) != len(intents):
+                    audit_events.append({
+                        "stage": "ground",
+                        "dropped": [i.capability for i in intents if i not in grounded],
+                    })
+                intents = grounded
+            if vault is not None and len(vault):
+                # Placeholders from the cloud planner are restored on-device only
+                intents = [
+                    i.model_copy(update={
+                        "args": vault.rehydrate_obj(i.args),
+                        "rationale": vault.rehydrate(i.rationale),
+                    })
+                    for i in intents
+                ]
             audit_events.append({
                 "stage": "parse",
                 "intent_count": len(intents),
@@ -86,9 +107,13 @@ class Orchestrator:
 
             if not intents:
                 # Model returned conversational reply, no actions
+                reply = self._extract_reply(raw_output)
+                if vault is not None:
+                    reply = vault.rehydrate(reply)
+                self._write_audit(audit_events)
                 return TurnResult(
                     success=True,
-                    reply=self._extract_reply(raw_output),
+                    reply=reply,
                     intents=[],
                     decisions=[],
                     execution_results=[],
@@ -144,10 +169,7 @@ class Orchestrator:
 
             # 8. Report
             reply = self._report(intents, decisions, execution_results)
-
-            if self.audit:
-                for event in audit_events:
-                    self.audit.write_event(event.get("stage", "unknown"), event)
+            self._write_audit(audit_events)
 
             return TurnResult(
                 success=True,
@@ -160,9 +182,7 @@ class Orchestrator:
 
         except (Exception, asyncio.CancelledError) as e:
             audit_events.append({"stage": "deny", "error": str(e)})
-            if self.audit:
-                for event in audit_events:
-                    self.audit.write_event(event.get("stage", "unknown"), event)
+            self._write_audit(audit_events)
             return TurnResult(
                 success=False,
                 reply=f"I was unable to complete that request. Reason: {e}",
@@ -177,20 +197,145 @@ class Orchestrator:
     def _capture(self, raw_input: str) -> str:
         return raw_input.strip()
 
-    async def _propose(self, utterance: str, cancel_token: CancelToken) -> str:
-        # Utilize the Local model as an Anonymizer / Formatter before Cloud
-        if hasattr(self.model, "format_intent"):
-            utterance = await getattr(self.model, "format_intent")(utterance, cancel_token)
+    def _write_audit(self, audit_events: list[dict[str, Any]]) -> None:
+        if self.audit:
+            for event in audit_events:
+                self.audit.write_event(event.get("stage", "unknown"), event)
 
+    async def _propose(
+        self,
+        utterance: str,
+        ctx: PolicyContext,
+        cancel_token: CancelToken,
+        audit_events: list[dict[str, Any]],
+    ) -> tuple[str, Vault | None]:
+        """Local Formatter -> Cloud Planner.
+
+        Local route: the raw utterance never leaves the device.
+        Cloud route: deterministic scrub + local span detection first; the
+        placeholder vault stays on-device so the reply can be rehydrated.
+        If the formatter fails, fail closed and plan locally.
+        """
         specs = self.registry.get_all_specs()
-        prompt = self.prompt_builder.build(utterance, specs)
-        return await self.model.generate(prompt, cancel_token)
+        router = self.model if isinstance(self.model, ModelRouter) else None
+
+        if router is None:
+            prompt = self.prompt_builder.build(utterance, specs)
+            return await self.model.generate(prompt, cancel_token), None
+
+        local_router: ModelRouter = router
+
+        async def plan_locally() -> tuple[str, Vault | None]:
+            # The local model may see the raw utterance; nothing leaves the device
+            prompt = self.prompt_builder.build(utterance, specs)
+            schema = self.prompt_builder.planner_schema(specs)
+            return await local_router.generate_local(prompt, cancel_token, schema=schema), None
+
+        if router.route(ctx.privacy_mode) is Route.LOCAL:
+            return await plan_locally()
+
+        vault = Vault()
+        anonymizer = Anonymizer(self.prompt_builder.known_entities())
+        sanitized = anonymizer.scrub(utterance, vault)
+        formatter_status = "unavailable"
+        if router.formatter is not None:
+            try:
+                spans = await router.formatter.detect_spans(sanitized, cancel_token)
+                sanitized = anonymizer.apply_spans(sanitized, spans, vault)
+                formatter_status = "ok"
+            except FormatterError as e:
+                print(f"[Orchestrator] {e}. Failing closed: planning locally.")
+                audit_events.append({"stage": "sanitize", "route": "local", "formatter": "failed"})
+                return await plan_locally()
+
+        prompt = self.prompt_builder.build(
+            sanitized, specs, scrub=lambda text: anonymizer.scrub(text, vault)
+        )
+        # Counts only; never the values or the mapping
+        audit_events.append({
+            "stage": "sanitize",
+            "route": "cloud",
+            "formatter": formatter_status,
+            "placeholders": len(vault),
+            "secrets_removed": anonymizer.stats.secrets_removed,
+            "spans_replaced": anonymizer.stats.spans_replaced,
+        })
+
+        try:
+            return await router.generate_cloud(prompt, cancel_token), vault
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            if router.local_model is None:
+                raise
+            print(f"Cloud Model failed ({e}). Falling back to Local Model...")
+            return await plan_locally()
+
+    # Words too generic to show the user asked for a specific capability
+    _GROUNDING_STOPWORDS = frozenset({
+        "the", "and", "for", "set", "using", "useful", "piece", "information",
+        "long", "term", "system", "apps", "application", "media", "web",
+        "writing", "messages", "documents", "text", "type", "keyboard", "browser",
+    })
+
+    def _planned_by_small_model(self, vault: Vault | None) -> bool:
+        """True when this turn's plan came from the on-device router model."""
+        return (
+            isinstance(self.model, ModelRouter)
+            and vault is None
+            and self.model.local_model is not None
+        )
+
+    def _grounding_score(self, intent: IntentProposal, utterance: str) -> tuple[bool, int]:
+        """How strongly the user's words point at this intent.
+
+        Grammar-constrained 1B output is always well formed, so without this
+        "hi" can come back as system.lock. An intent is grounded when a
+        capability keyword (e.g. "lock", "volume") or a fixed-choice action
+        ("pause", "restart") appears in the utterance. Free-text args never
+        count: they can simply echo the utterance.
+        """
+        words = re.findall(r"[a-z0-9]+", utterance.lower())
+        try:
+            spec = self.registry.get_spec(intent.capability)
+        except Exception:
+            return False, 0
+        keywords = {
+            k for k in re.findall(r"[a-z]+", f"{intent.capability} {spec.summary}".lower().replace("_", " "))
+            if len(k) >= 3 and k not in self._GROUNDING_STOPWORDS
+        }
+        keyword_hits = sum(
+            1 for k in keywords if any(w.startswith(k[:4]) for w in words if len(w) >= 3)
+        )
+        action_hit = False
+        enum_hits = 0
+        properties = spec.args_model.model_json_schema().get("properties", {})
+        for key, value in intent.args.items():
+            if properties.get(key, {}).get("enum") and isinstance(value, str) and value.lower() in words:
+                enum_hits += 1
+                action_hit = action_hit or key == "action"
+        return keyword_hits > 0 or action_hit, keyword_hits + enum_hits
+
+    def _ground_intents(self, intents: list[IntentProposal], utterance: str) -> list[IntentProposal]:
+        scored = [(i, *self._grounding_score(i, utterance)) for i in intents]
+        grounded = [(i, score) for i, ok, score in scored if ok]
+        multi_step = re.search(r"\b(and|then|also|after that)\b|[,;]", utterance.lower())
+        if len(grounded) > 1 and not multi_step:
+            # One request, one action: keep the best-supported intent
+            grounded = [max(grounded, key=lambda pair: pair[1])]
+        return [i for i, _ in grounded]
 
     def _parse(self, raw_output: str) -> list[IntentProposal]:
         try:
-            return self.parser.parse(raw_output)
+            intents = self.parser.parse(raw_output)
         except IntentParserError:
             return []
+        # Small models often repeat the same intent; run each action once
+        unique: list[IntentProposal] = []
+        for intent in intents:
+            if intent not in unique:
+                unique.append(intent)
+        return unique
 
     def _decide(self, intent: IntentProposal, ctx: PolicyContext) -> PolicyDecision:
         return self.policy_engine.decide(intent, ctx)
@@ -247,15 +392,40 @@ class Orchestrator:
 
         return "; ".join(parts) if parts else "No actions were taken."
 
+    FALLBACK_REPLY = "I'm not sure how to help with that."
+    REPLY_KEYS = ("reply", "response", "message", "text", "answer")
+
     def _extract_reply(self, raw_output: str) -> str:
-        import json
+        """Pull the conversational reply out of whatever the model produced.
+
+        Accepts strict JSON, JSON wrapped in prose or code fences, alternate
+        reply keys, and plain conversational text (common from small models).
+        """
         text = raw_output.strip()
-        try:
-            data = json.loads(text)
-            if isinstance(data, dict):
-                return str(data.get("reply", "I'm not sure how to help with that."))
-        except (json.JSONDecodeError, ValueError):
-            # If it's clearly not JSON but has some length, just return the text
-            if len(text) > 0 and not text.startswith("{") and not text.startswith("["):
-                return text
-        return "I'm not sure how to help with that."
+        if not text:
+            return self.FALLBACK_REPLY
+
+        data = self._first_json_value(text)
+        if data is None:
+            # No JSON at all: the model just chatted. Use it as the reply.
+            return text.strip("`").strip() or self.FALLBACK_REPLY
+
+        if isinstance(data, dict):
+            for key in self.REPLY_KEYS:
+                value = data.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+        return self.FALLBACK_REPLY
+
+    @staticmethod
+    def _first_json_value(text: str) -> Any:
+        import json
+        decoder = json.JSONDecoder()
+        for i, ch in enumerate(text):
+            if ch in "{[":
+                try:
+                    value, _ = decoder.raw_decode(text, i)
+                    return value
+                except json.JSONDecodeError:
+                    continue
+        return None

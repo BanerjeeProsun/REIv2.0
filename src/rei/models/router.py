@@ -1,49 +1,58 @@
-from typing import Optional
+from enum import Enum
+from typing import Any, Optional
 from rei.models.adapter import ModelAdapter
+from rei.models.formatter import LocalFormatter
 from rei.core.cancellation import CancelToken
+from rei.policy.schemas import PrivacyMode
+
+
+class Route(Enum):
+    LOCAL = "local"
+    CLOUD = "cloud"
 
 
 class ModelRouter(ModelAdapter):
     """
-    Routes inference requests based on active models and handles graceful fallback.
+    Chooses between the on-device and cloud planners.
+
+    The cloud planner is only used in Cloud Assisted mode, and only with a
+    prompt that has been sanitized by the caller (see Orchestrator._propose).
+    generate() is always local, so an unsanitized prompt can never leave the device.
     """
     def __init__(self, cloud_model: Optional[ModelAdapter], local_model: Optional[ModelAdapter]):
         self.cloud_model = cloud_model
         self.local_model = local_model
-        
-    async def generate(self, prompt: str, cancel_token: CancelToken, deadline_ms: int = 15000) -> str:
-        # Try cloud model first if available
-        if self.cloud_model:
-            try:
-                print("Routing to Cloud Model (NIM)...")
-                response = await self.cloud_model.generate(prompt, cancel_token, deadline_ms=deadline_ms)
-                return response
-            except Exception as e:
-                print(f"Cloud Model failed ({e}). Gracefully falling back to Local Model...")
-                
-        # Fallback to local model
-        if self.local_model:
-            print("Routing to Local Model (Llama 1B)...")
-            return await self.local_model.generate(prompt, cancel_token, deadline_ms=deadline_ms)
-            
-        raise RuntimeError("No models available (both cloud and local failed or are uninitialized)")
-
-    async def format_intent(self, utterance: str, cancel_token: CancelToken) -> str:
-        if not self.local_model:
-            return utterance
-            
-        prompt = (
-            "You are a strict data-privacy formatter. "
-            "Rewrite the following user intent to remove any sensitive Personal Identifiable Information "
-            "(PII), secrets, or private keys, replacing them with placeholders like [REDACTED_NAME] or [REDACTED_KEY]. "
-            "If there is no sensitive data, output the original string exactly. Do not add conversational text. "
-            f"\n\nUser Input: {utterance}"
+        # The local model doubles as the privacy formatter in front of the cloud
+        self.formatter: LocalFormatter | None = (
+            LocalFormatter(local_model) if local_model is not None and hasattr(local_model, "generate_json") else None
         )
-        try:
-            # We enforce a strict short deadline for the formatter to keep the UI snappy
-            formatted = await self.local_model.generate(prompt, cancel_token, deadline_ms=5000)
-            print(f"[ModelRouter] Local model formatted intent: {formatted}")
-            return formatted.strip()
-        except Exception as e:
-            print(f"[ModelRouter] Local model formatter failed ({e}). Proceeding with original utterance.")
-            return utterance
+
+    def route(self, privacy_mode: PrivacyMode) -> Route:
+        if privacy_mode == PrivacyMode.CLOUD_ASSISTED and self.cloud_model is not None:
+            return Route.CLOUD
+        return Route.LOCAL
+
+    async def generate(self, prompt: str, cancel_token: CancelToken, deadline_ms: int = 60000) -> str:
+        return await self.generate_local(prompt, cancel_token, deadline_ms)
+
+    async def generate_local(
+        self,
+        prompt: str,
+        cancel_token: CancelToken,
+        deadline_ms: int = 60000,
+        schema: dict[str, Any] | None = None,
+    ) -> str:
+        if not self.local_model:
+            raise RuntimeError("No local model available")
+        print("Routing to Local Model (Llama 1B)...")
+        generate_json = getattr(self.local_model, "generate_json", None)
+        if schema is not None and generate_json is not None:
+            # Registry-derived grammar: the small model can only emit valid intents
+            return str(await generate_json(None, prompt, schema, cancel_token, deadline_ms=deadline_ms, max_tokens=512))
+        return await self.local_model.generate(prompt, cancel_token, deadline_ms=deadline_ms)
+
+    async def generate_cloud(self, sanitized_prompt: str, cancel_token: CancelToken, deadline_ms: int = 15000) -> str:
+        if not self.cloud_model:
+            raise RuntimeError("No cloud model available")
+        print("Routing to Cloud Model (NIM)...")
+        return await self.cloud_model.generate(sanitized_prompt, cancel_token, deadline_ms=deadline_ms)
