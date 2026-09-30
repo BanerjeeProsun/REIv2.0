@@ -1,12 +1,10 @@
 import socket
 import inspect
-from typing import Any, Callable
+from typing import Any
+
 
 class EgressBlockedError(Exception):
     pass
-
-_original_socket_connect: Callable[..., Any] = socket.socket.connect
-_original_socket_connect_ex: Callable[..., Any] = socket.socket.connect_ex
 
 def _is_loopback(address: Any) -> bool:
     if not isinstance(address, tuple) or len(address) < 2:

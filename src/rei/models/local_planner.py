@@ -1,10 +1,41 @@
 import asyncio
+import json
+import threading
 from pathlib import Path
+from typing import Any
 from rei.models.adapter import ModelAdapter
 from rei.core.cancellation import CancelToken
 
 class LocalPlannerError(Exception):
     pass
+
+
+# Grammar-constrained output shape for the planner. llama.cpp compiles this
+# into a GBNF grammar, so the small model can only emit valid JSON of this form
+# (conversational replies go in "reply" instead of breaking the parser).
+PLANNER_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "reply": {"type": "string"},
+        "intents": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "type": {"type": "string", "enum": ["intent"]},
+                    "capability": {"type": "string"},
+                    "capability_version": {"type": "integer"},
+                    "args": {"type": "object"},
+                    "rationale": {"type": "string"},
+                },
+                "required": ["type", "capability", "capability_version", "args", "rationale"],
+            },
+        },
+    },
+    "required": ["reply", "intents"],
+}
+
 
 class LocalPlanner(ModelAdapter):
     """Wraps llama-cpp-python for local GGUF inference."""
@@ -30,32 +61,63 @@ class LocalPlanner(ModelAdapter):
         except Exception as e:
             raise LocalPlannerError(f"Failed to load GGUF model: {e}")
 
-    async def generate(self, prompt: str, cancel_token: CancelToken, deadline_ms: int = 5000) -> str:
+        # llama.cpp contexts are not thread-safe; a timed-out call may still be
+        # running in its worker thread when the next one starts.
+        self._lock = threading.Lock()
+
+    async def generate(self, prompt: str, cancel_token: CancelToken, deadline_ms: int = 60000) -> str:
+        return await self.generate_json(
+            system=None,
+            user=prompt,
+            schema=PLANNER_SCHEMA,
+            cancel_token=cancel_token,
+            deadline_ms=deadline_ms,
+            max_tokens=512,
+        )
+
+    async def generate_json(
+        self,
+        system: str | None,
+        user: str,
+        schema: dict[str, Any],
+        cancel_token: CancelToken,
+        deadline_ms: int = 60000,
+        max_tokens: int = 512,
+    ) -> str:
+        """Chat completion constrained to `schema`. Returns a JSON string."""
         cancel_token.raise_if_cancelled()
-        
-        loop = asyncio.get_running_loop()
-        
+
+        messages: list[dict[str, str]] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": user})
+
         def _generate_sync() -> str:
-            # Llama 3.2 Instruct format
-            formatted_prompt = (
-                f"<|start_header_id|>system<|end_header_id|>\n\n"
-                f"{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
-            )
-            
-            output = self.model(
-                formatted_prompt,
-                max_tokens=512,
-                stop=["<|eot_id|>"],
-                temperature=0.0
-            )
-            return output["choices"][0]["text"].strip() # type: ignore
-            
+            with self._lock:
+                output = self.model.create_chat_completion(
+                    messages=messages,  # type: ignore[arg-type]
+                    response_format={"type": "json_object", "schema": schema},
+                    max_tokens=max_tokens,
+                    temperature=0.0,
+                )
+            return str(output["choices"][0]["message"]["content"] or "").strip()  # type: ignore[index]
+
+        loop = asyncio.get_running_loop()
         try:
-            # TODO: apply deadline_ms via asyncio.wait_for
-            text = await loop.run_in_executor(None, _generate_sync)
-            cancel_token.raise_if_cancelled()
-            return text
+            text = await asyncio.wait_for(
+                loop.run_in_executor(None, _generate_sync), timeout=deadline_ms / 1000.0
+            )
+        except asyncio.TimeoutError:
+            raise LocalPlannerError(f"Local inference exceeded {deadline_ms} ms")
         except asyncio.CancelledError:
             raise
         except Exception as e:
             raise LocalPlannerError(f"Local inference failed: {e}")
+
+        cancel_token.raise_if_cancelled()
+        # Grammar guarantees JSON, but max_tokens can truncate it
+        try:
+            json.loads(text)
+        except json.JSONDecodeError:
+            print("[LocalPlanner] Output truncated or malformed; returning raw text.")
+        return text

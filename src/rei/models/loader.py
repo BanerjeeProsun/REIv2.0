@@ -26,8 +26,8 @@ class ModelLoader:
         if not expected_hash:
             raise ModelVerificationError(f"Model {model_name} is not in models.lock")
             
-        # Ban pickle explicitly by extension
-        if model_name.endswith(".pkl") or model_name.endswith(".pt") or model_name.endswith(".bin"):
+        # Ban pickle formats explicitly by extension (SUP-01)
+        if model_name.endswith((".pkl", ".pt", ".pickle")):
             raise ModelVerificationError(f"Model {model_name} uses a banned pickle format")
             
         hasher = hashlib.sha256()

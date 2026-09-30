@@ -26,6 +26,41 @@ class ConfirmationBroker:
             
         return False
 
+import asyncio
+import uuid
+
+class UIClientWired:
+    def __init__(self, backend: 'ReiBackend') -> None:
+        self.backend = backend
+        self.pending_confirmations: dict[str, asyncio.Future[bool]] = {}
+        self.backend.response_callback = self._on_response
+        
+    def _on_response(self, intent_id: str, approved: bool) -> None:
+        if intent_id in self.pending_confirmations:
+            if not self.pending_confirmations[intent_id].done():
+                self.pending_confirmations[intent_id].set_result(approved)
+
+    async def prompt_voice_or_click(self, intent: IntentProposal) -> bool:
+        return await self._request(intent, "Confirmation Needed")
+
+    async def prompt_click(self, intent: IntentProposal) -> bool:
+        return await self._request(intent, "Action Requires Click")
+
+    async def prompt_click_with_review(self, intent: IntentProposal) -> bool:
+        return await self._request(intent, "Review Required")
+        
+    async def _request(self, intent: IntentProposal, title: str) -> bool:
+        intent_id = str(uuid.uuid4())
+        future = asyncio.Future()
+        self.pending_confirmations[intent_id] = future
+        message = f"Capability: {intent.capability}\nReason: {intent.rationale}\nArgs: {intent.args}"
+        self.backend.confirmationRequested.emit(title, message, intent_id)
+        try:
+            return await future
+        finally:
+            if intent_id in self.pending_confirmations:
+                del self.pending_confirmations[intent_id]
+
 class UIClientMock:
     async def prompt_voice_or_click(self, intent: IntentProposal) -> bool:
         print(f"UI: Voice or Click required for {intent.capability}")

@@ -41,9 +41,10 @@ class Redactor:
             new_dict = {}
             found_any_secret = False
             for k, v in payload.items():
-                new_v, found = self.redact_payload(v)
-                new_dict[k] = new_v
-                if found:
+                new_k, found_k = self.redact_payload(k)
+                new_v, found_v = self.redact_payload(v)
+                new_dict[new_k] = new_v
+                if found_k or found_v:
                     found_any_secret = True
             return new_dict, found_any_secret
         elif isinstance(payload, list):
@@ -55,5 +56,11 @@ class Redactor:
                 if found:
                     found_any_secret = True
             return new_list, found_any_secret
+        elif isinstance(payload, tuple):
+            new_list, found_any_secret = self.redact_payload(list(payload))
+            return tuple(new_list), found_any_secret
+        elif isinstance(payload, set):
+            new_list, found_any_secret = self.redact_payload(list(payload))
+            return set(new_list), found_any_secret
         else:
             return payload, False

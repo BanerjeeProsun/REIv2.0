@@ -5,33 +5,36 @@ from typing import Callable, Awaitable
 from rei.voice.capture import AudioCapture
 from rei.voice.vad import VoiceActivityDetector
 from rei.voice.stt import SpeechToText
-from rei.voice.tts import TextToSpeech
 from rei.voice.aec import EchoCanceller
 from rei.core.cancellation import CancelToken
 
 
 class VoiceLoop:
-    """Manages the full voice pipeline (Capture -> VAD -> STT -> TTS)."""
+    """Manages the voice input pipeline (Capture -> VAD -> STT -> turn runner).
+
+    Speech output is owned by the shared Speaker (rei.voice.speaker), which
+    marks the same EchoCanceller for voice, typed and greeting replies.
+    """
 
     def __init__(
         self,
         capture: AudioCapture,
         vad: VoiceActivityDetector,
         stt: SpeechToText,
-        tts: TextToSpeech,
         aec: EchoCanceller,
-        on_utterance: Callable[[str], Awaitable[str]],
+        on_utterance: Callable[[str], Awaitable[None]],
         on_volume: Callable[[float], None] = lambda v: None,
-        on_status: Callable[[str], None] = lambda s: None
+        on_transcribing: Callable[[], None] = lambda: None,
+        on_discard: Callable[[], None] = lambda: None,
     ) -> None:
         self.capture = capture
         self.vad = vad
         self.stt = stt
-        self.tts = tts
         self.aec = aec
         self.on_utterance = on_utterance
         self.on_volume = on_volume
-        self.on_status = on_status
+        self.on_transcribing = on_transcribing
+        self.on_discard = on_discard
         self._running = False
         self._speech_buffer: list[np.ndarray] = []
         self._silence_frames = 0
@@ -45,7 +48,6 @@ class VoiceLoop:
         
         print("Voice loop started. Listening...")
         
-        chunk_count = 0
         while self._running:
             try:
                 # Get raw audio chunk from microphone
@@ -54,7 +56,6 @@ class VoiceLoop:
                 vol = float(np.max(np.abs(chunk)))
                 self.on_volume(vol)
                 
-                chunk_count += 1
                 # Check AEC to avoid transcribing our own TTS
                 if self.aec.should_suppress():
                     self._reset_vad()
@@ -104,31 +105,23 @@ class VoiceLoop:
         cancel_token = CancelToken()
         try:
             print("Transcribing...")
+            self.on_transcribing()
             text = await self.stt.transcribe(full_audio, cancel_token)
             if not text.strip():
+                # Nothing usable was heard: return the UI to its rest state
+                self.on_discard()
                 return
                 
-            self.on_status(f"Heard: {text}")
             print(f"Heard: {text}")
             
-            # Send to Orchestrator (via callback)
-            response_text = await self.on_utterance(text)
-            
-            # TTS
-            if response_text:
-                self.aec.mark_playback_active(True)
-                try:
-                    print(f"Speaking: {response_text}")
-                    await self.tts.speak(response_text, cancel_token)
-                finally:
-                    # Give physical speakers 400ms to stop echoing into the mic
-                    await asyncio.sleep(0.4)
-                    self.aec.mark_playback_active(False)
-                    self.capture.clear()
-                    
+            # Hand off to the turn runner, which plans, replies and speaks
+            # (speech goes through the shared Speaker, which drives the AEC)
+            await self.on_utterance(text)
+
         except asyncio.CancelledError:
             print("Voice turn cancelled.")
         except Exception as e:
             print(f"Failed to process utterance: {e}")
+            self.on_discard()
         finally:
             self.capture.clear()

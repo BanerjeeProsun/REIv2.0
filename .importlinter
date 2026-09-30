@@ -14,6 +14,10 @@ forbidden_modules =
     requests
     urllib3
     aiohttp
+ignore_imports =
+    rei.models.nim_planner -> httpx
+    rei.egress.gate -> httpx
+    rei.capabilities.builtin.files -> httpx
 
 [importlinter:contract:no-subprocess]
 name = No subprocess
@@ -25,6 +29,7 @@ forbidden_modules =
 ignore_imports =
     rei.app.job_object -> subprocess
     rei.app.supervisor -> subprocess
+    rei.capabilities.builtin.apps -> subprocess
 
 
 [importlinter:contract:policy-is-pure]
