@@ -43,7 +43,7 @@ def apps_open_handler(args: OpenAppArgs) -> dict[str, str]:
         raise ValueError(f"App {args.app} not found in allowlist")
 
     try:
-        proc = subprocess.Popen(path)
+        proc = subprocess.Popen(path)  # noqa: S603
         print(f"Launched: {path}")
         # Let a following "type ..." in the same request target this app
         from rei.capabilities.builtin import _win_input

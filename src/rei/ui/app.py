@@ -1,8 +1,10 @@
 import sys
 from pathlib import Path
+from typing import Any, Callable
 from PySide6.QtCore import QObject, Signal, Property, Slot
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtWidgets import QApplication
+
 
 class ReiBackend(QObject):
     statusChanged = Signal()
@@ -10,122 +12,139 @@ class ReiBackend(QObject):
     outputLevelChanged = Signal()
     stateChanged = Signal()
     messageAdded = Signal(str, bool)
-    confirmationRequested = Signal(str, str, str) # title, message, intent_id
-    confirmationHint = Signal(str, int, bool)     # spoken-answer hint, seconds to answer, strict
-    confirmationClosed = Signal(str)              # intent_id answered/expired (close the popup)
+    confirmationRequested = Signal(str, str, str)  # title, message, intent_id
+    confirmationHint = Signal(str, int, bool)      # spoken-answer hint, seconds to answer, strict
+    confirmationClosed = Signal(str)               # intent_id answered/expired (close the popup)
     textMessageReceived = Signal(str)
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._status = "How can I help you?"
         self._volume = 0.0
         self._output_level = 0.0
         self._state = "idle"
-        self.response_callback = None
+        self._user_name = ""
+        self._needs_setup = False
+        self._now_playing = ""
+        self._now_paused = False
+        self._now_source = ""
+        self._privacy_mode = "Local Only"
+        self.response_callback: Callable[[str, bool], None] | None = None
 
     @Slot(str, bool)
-    def sendConfirmationResponse(self, intent_id: str, approved: bool):
+    def sendConfirmationResponse(self, intent_id: str, approved: bool) -> None:
         if self.response_callback:
             self.response_callback(intent_id, approved)
 
     @Slot(str)
-    def sendTextMessage(self, text: str):
+    def sendTextMessage(self, text: str) -> None:
         self.textMessageReceived.emit(text)
 
     onboardingCompleted = Signal(str, str)
+
     @Slot(str, str)
-    def completeOnboarding(self, name: str, purpose: str):
+    def completeOnboarding(self, name: str, purpose: str) -> None:
         self.userName = name
         self.onboardingCompleted.emit(name, purpose)
 
     userNameChanged = Signal()
+
     @Property(str, notify=userNameChanged)
-    def userName(self):
+    def userName(self) -> str:
         """First name for the home greeting ("Good evening, Ada.")."""
         return getattr(self, '_user_name', "")
 
     @userName.setter
-    def userName(self, val):
+    def userName(self, val: str) -> None:
         first = (val or "").strip().split(" ")[0]
         if getattr(self, '_user_name', "") != first:
             self._user_name = first
             self.userNameChanged.emit()
 
     needsSetupChanged = Signal()
+
     @Property(bool, notify=needsSetupChanged)
-    def needsSetup(self):
+    def needsSetup(self) -> bool:
         return getattr(self, '_needs_setup', False)
 
     @needsSetup.setter
-    def needsSetup(self, val):
+    def needsSetup(self, val: bool) -> None:
         self._needs_setup = val
         self.needsSetupChanged.emit()
 
     @Property(str, notify=statusChanged)
-    def status(self):
+    def status(self) -> str:
         return self._status
 
     @status.setter
-    def status(self, val):
+    def status(self, val: str) -> None:
         if self._status != val:
             self._status = val
             self.statusChanged.emit()
 
     @Property(float, notify=volumeChanged)
-    def volume(self):
+    def volume(self) -> float:
         return self._volume
 
     @volume.setter
-    def volume(self, val):
+    def volume(self, val: float) -> None:
         if self._volume != val:
             self._volume = val
             self.volumeChanged.emit()
 
     @Property(float, notify=outputLevelChanged)
-    def outputLevel(self):
+    def outputLevel(self) -> float:
         """Amplitude (0..1) of Rei's own speech, for the orb animation."""
         return self._output_level
 
     @outputLevel.setter
-    def outputLevel(self, val):
+    def outputLevel(self, val: float) -> None:
         if self._output_level != val:
             self._output_level = val
             self.outputLevelChanged.emit()
 
     @Property(str, notify=stateChanged)
-    def state(self):
+    def state(self) -> str:
         return self._state
 
     @state.setter
-    def state(self, val):
+    def state(self, val: str) -> None:
         if self._state != val:
             self._state = val
             self.stateChanged.emit()
 
     privacyModeChanged = Signal()
-    privacyModeToggled = Signal()
     privacyModeSelected = Signal(str)
-
-    @Slot()
-    def togglePrivacyMode(self):
-        self.privacyModeToggled.emit()
+    privacyModeChangeRequested = Signal(str)  # open the confirm dialog ("" = current mode)
 
     @Slot(str)
-    def setPrivacyMode(self, mode: str):
-        """mode: "Local Only", "Local + Connectors" or "Cloud Assisted"."""
+    def requestPrivacyMode(self, mode: str) -> None:
+        """Ask to change mode. Nothing switches until the dialog is confirmed."""
+        self.privacyModeChangeRequested.emit(mode)
+
+    @Slot(str)
+    def setPrivacyMode(self, mode: str) -> None:
+        """Apply a confirmed mode: "Local Only", "Local + Connectors" or "Cloud Assisted"."""
         self.privacyModeSelected.emit(mode)
 
+    # Stop Rei mid-thought or mid-sentence (stop button, Esc, orb tap)
+    interruptRequested = Signal()
+
+    @Slot()
+    def interrupt(self) -> None:
+        self.interruptRequested.emit()
+
     # Connectors (Email, YouTube, Spotify...)
-    connectRequested = Signal(str, str)      # connector id, JSON params
-    disconnectRequested = Signal(str)        # connector id
-    connectorResult = Signal(str, bool, str) # connector id, ok, message
+    connectRequested = Signal(str, str)       # connector id, JSON params
+    disconnectRequested = Signal(str)         # connector id
+    connectorResult = Signal(str, bool, str)  # connector id, ok, message
 
     @Slot(str, str)
-    def connectConnector(self, cid: str, params_json: str):
+    def connectConnector(self, cid: str, params_json: str) -> None:
         self.connectRequested.emit(cid, params_json)
 
     @Slot(str)
-    def disconnectConnector(self, cid: str):
+    def disconnectConnector(self, cid: str) -> None:
         self.disconnectRequested.emit(cid)
 
     # Music now playing (sidebar mini player)
@@ -133,15 +152,15 @@ class ReiBackend(QObject):
     playerCommand = Signal(str)  # "toggle" | "stop" | "next"
 
     @Property(str, notify=nowPlayingChanged)
-    def nowPlaying(self):
+    def nowPlaying(self) -> str:
         return getattr(self, "_now_playing", "")
 
     @Property(bool, notify=nowPlayingChanged)
-    def nowPlayingPaused(self):
+    def nowPlayingPaused(self) -> bool:
         return getattr(self, "_now_paused", False)
 
     @Property(str, notify=nowPlayingChanged)
-    def nowPlayingSource(self):
+    def nowPlayingSource(self) -> str:
         return getattr(self, "_now_source", "")
 
     def set_now_playing(self, title: str, paused: bool, source: str) -> None:
@@ -149,15 +168,15 @@ class ReiBackend(QObject):
         self.nowPlayingChanged.emit()
 
     @Slot(str)
-    def sendPlayerCommand(self, command: str):
+    def sendPlayerCommand(self, command: str) -> None:
         self.playerCommand.emit(command)
 
     @Property(str, notify=privacyModeChanged)
-    def privacyModeText(self):
+    def privacyModeText(self) -> str:
         return getattr(self, '_privacy_mode', "Local Only")
 
     @privacyModeText.setter
-    def privacyModeText(self, val):
+    def privacyModeText(self, val: str) -> None:
         self._privacy_mode = val
         self.privacyModeChanged.emit()
 
@@ -172,7 +191,7 @@ class ReiUI:
         from PySide6.QtQuickControls2 import QQuickStyle
         QQuickStyle.setStyle("Basic")
         self.engine = QQmlApplicationEngine()
-        
+
         # Expose backend to QML
         self.engine.rootContext().setContextProperty("backend", self.backend)
         self._loaded = False
@@ -189,19 +208,28 @@ class ReiUI:
             print("CRITICAL: Failed to load QML UI.")
             sys.exit(-1)
 
-    PRIVACY_MODES = {"local_only": "Local Only", "local_plus_web": "Local + Connectors",
-                     "cloud_assisted": "Cloud Assisted"}
+    PRIVACY_MODES = {
+        "local_only": "Local Only",
+        "local_plus_web": "Local + Connectors",
+        "cloud_assisted": "Cloud Assisted",
+    }
 
-    def set_context(self, store, registry, policy_config, connectors=None):
+    def set_context(
+        self,
+        store: Any,
+        registry: Any,
+        policy_config: Any,
+        connectors: Any = None,
+    ) -> None:
         from rei.ui.models import MemoryModel, CapabilityModel, ConnectorModel
         self.memory_model = MemoryModel(store)
         self.capability_model = CapabilityModel(registry)
         self.connector_model = ConnectorModel(connectors)
-        
+
         self.engine.rootContext().setContextProperty("memoryModel", self.memory_model)
         self.engine.rootContext().setContextProperty("capabilityModel", self.capability_model)
         self.engine.rootContext().setContextProperty("connectorModel", self.connector_model)
-        
+
         # Determine privacy mode
         mode = str(policy_config.get("defaults", {}).get("privacy_mode", "local_only")).lower()
         self.backend.privacyModeText = self.PRIVACY_MODES.get(mode, "Local Only")
@@ -254,5 +282,5 @@ class ReiUI:
     def update_output_level(self, level: float) -> None:
         self.backend.outputLevel = max(0.0, min(1.0, level))
 
-    def close(self):
+    def close(self) -> None:
         QApplication.quit()

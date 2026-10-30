@@ -18,39 +18,11 @@ PageScaffold {
         onClicked: page.activated()
     }
 
-    // Empty state
-    SurfaceCard {
+    EmptyState {
         visible: memoryRepeater.count === 0
-        padding: 40
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 8
-            Icon {
-                Layout.alignment: Qt.AlignHCenter
-                source: Qt.resolvedUrl("../icons/memory.svg")
-                size: 28
-                color: Theme.textMuted
-            }
-            Text {
-                Layout.fillWidth: true
-                Layout.topMargin: 8
-                horizontalAlignment: Text.AlignHCenter
-                text: "No memories yet"
-                color: Theme.textPrimary
-                font.family: Theme.fontDisplay
-                font.pixelSize: Theme.sizeSubheading
-                font.weight: Font.DemiBold
-            }
-            Text {
-                Layout.fillWidth: true
-                horizontalAlignment: Text.AlignHCenter
-                text: "Ask Rei to remember something and it will appear here."
-                color: Theme.textSecondary
-                font.family: Theme.fontText
-                font.pixelSize: Theme.sizeBodySm
-                wrapMode: Text.WordWrap
-            }
-        }
+        iconSource: Qt.resolvedUrl("../icons/memory.svg")
+        title: "No memories yet"
+        body: "Ask Rei to remember something and it will appear here."
     }
 
     Repeater {
@@ -61,24 +33,20 @@ PageScaffold {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: Theme.s8
-                Tag { text: model.kind }
-                Tag { text: model.dataClass; ink: Theme.textMuted }
+                Tag { text: model.kind; ink: Theme.porcelain }
+                Tag { text: model.dataClass }
                 Item { Layout.fillWidth: true }
-                Text {
+                ReiText {
                     Layout.alignment: Qt.AlignVCenter
+                    role: "utilityNav"
                     text: model.createdAt
-                    color: Theme.textMuted
-                    font.family: Theme.fontText
-                    font.pixelSize: Theme.sizeCaption
+                    color: Theme.ash
                 }
             }
-            Text {
+            ReiText {
                 Layout.fillWidth: true
+                role: "reading"
                 text: model.content
-                color: Theme.textBody
-                font.family: Theme.fontText
-                font.pixelSize: Theme.sizeBody
-                lineHeight: 1.4
                 wrapMode: Text.Wrap
             }
         }

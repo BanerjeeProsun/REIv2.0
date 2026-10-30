@@ -1,6 +1,7 @@
-from PySide6.QtCore import QAbstractListModel, Qt, QByteArray, Slot, Signal, QModelIndex
+from PySide6.QtCore import QAbstractListModel, Qt, QByteArray, Slot, QModelIndex
 from typing import Any, List, Dict
 import time
+
 
 class MemoryModel(QAbstractListModel):
     IdRole = Qt.ItemDataRole.UserRole + 1
@@ -9,7 +10,7 @@ class MemoryModel(QAbstractListModel):
     DataClassRole = Qt.ItemDataRole.UserRole + 4
     CreatedAtRole = Qt.ItemDataRole.UserRole + 5
 
-    def __init__(self, store: Any, parent=None):
+    def __init__(self, store: Any, parent: Any = None) -> None:
         super().__init__(parent)
         self.store = store
         self._memories: List[Dict[str, Any]] = []
@@ -24,10 +25,10 @@ class MemoryModel(QAbstractListModel):
             self.CreatedAtRole: QByteArray(b"createdAt")
         }
 
-    def rowCount(self, parent=QModelIndex()) -> int:
+    def rowCount(self, parent: Any = QModelIndex()) -> int:
         return len(self._memories)
 
-    def data(self, index, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def data(self, index: Any, role: int = int(Qt.ItemDataRole.DisplayRole)) -> Any:
         if not index.isValid() or not (0 <= index.row() < len(self._memories)):
             return None
         mem = self._memories[index.row()]
@@ -53,16 +54,17 @@ class MemoryModel(QAbstractListModel):
         return str(content)
 
     @Slot()
-    def refresh(self):
+    def refresh(self) -> None:
         self.beginResetModel()
         self._memories = self.store.list_all() if self.store else []
         self.endResetModel()
 
     @Slot(str)
-    def delete_memory(self, memory_id: str):
+    def delete_memory(self, memory_id: str) -> None:
         # We don't have delete in MemoryStore yet, so we just log "Coming Soon" behavior.
         # Actually, let's not fake it if not implemented.
         pass
+
 
 class CapabilityModel(QAbstractListModel):
     IdRole = Qt.ItemDataRole.UserRole + 1
@@ -70,10 +72,10 @@ class CapabilityModel(QAbstractListModel):
     TierRole = Qt.ItemDataRole.UserRole + 3
     NetworkRole = Qt.ItemDataRole.UserRole + 4
 
-    def __init__(self, registry: Any, parent=None):
+    def __init__(self, registry: Any, parent: Any = None) -> None:
         super().__init__(parent)
         self.registry = registry
-        self._caps = []
+        self._caps: List[Any] = []
         self.refresh()
 
     def roleNames(self) -> Dict[int, QByteArray]:
@@ -84,10 +86,10 @@ class CapabilityModel(QAbstractListModel):
             self.NetworkRole: QByteArray(b"network")
         }
 
-    def rowCount(self, parent=QModelIndex()) -> int:
+    def rowCount(self, parent: Any = QModelIndex()) -> int:
         return len(self._caps)
 
-    def data(self, index, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def data(self, index: Any, role: int = int(Qt.ItemDataRole.DisplayRole)) -> Any:
         if not index.isValid() or not (0 <= index.row() < len(self._caps)):
             return None
         cap = self._caps[index.row()]
@@ -102,7 +104,7 @@ class CapabilityModel(QAbstractListModel):
         return None
 
     @Slot()
-    def refresh(self):
+    def refresh(self) -> None:
         self.beginResetModel()
         self._caps = self.registry.get_all_specs() if self.registry else []
         self.endResetModel()
@@ -119,7 +121,7 @@ class ConnectorModel(QAbstractListModel):
     FieldsRole = Qt.ItemDataRole.UserRole + 7
     NoteRole = Qt.ItemDataRole.UserRole + 8
 
-    def __init__(self, manager: Any, parent=None):
+    def __init__(self, manager: Any, parent: Any = None) -> None:
         super().__init__(parent)
         self.manager = manager
         self._items: List[Any] = []
@@ -137,10 +139,10 @@ class ConnectorModel(QAbstractListModel):
             self.NoteRole: QByteArray(b"note"),
         }
 
-    def rowCount(self, parent=QModelIndex()) -> int:
+    def rowCount(self, parent: Any = QModelIndex()) -> int:
         return len(self._items)
 
-    def data(self, index, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def data(self, index: Any, role: int = int(Qt.ItemDataRole.DisplayRole)) -> Any:
         if not index.isValid() or not (0 <= index.row() < len(self._items)):
             return None
         c = self._items[index.row()]
@@ -164,7 +166,7 @@ class ConnectorModel(QAbstractListModel):
         return None
 
     @Slot()
-    def refresh(self):
+    def refresh(self) -> None:
         self.beginResetModel()
         self._items = list(self.manager.connectors.values()) if self.manager else []
         self.endResetModel()

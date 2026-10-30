@@ -1,8 +1,10 @@
 import asyncio
 import numpy as np
 import os
+import re
 import site
 from pathlib import Path
+from typing import Any
 
 # Add pip-installed NVIDIA DLLs to PATH for CTranslate2 GPU support
 try:
@@ -13,14 +15,45 @@ try:
         if cublas_path.exists() and cudnn_path.exists():
             os.environ["PATH"] = f"{cublas_path};{cudnn_path};{os.environ.get('PATH', '')}"
             break
-except Exception:
+except (AttributeError, OSError):
     pass
 
-from faster_whisper import WhisperModel # type: ignore
+from faster_whisper import WhisperModel  # type: ignore
 from rei.core.cancellation import CancelToken
+
 
 class STTError(Exception):
     pass
+
+
+# Whisper "hears" these in silence, fans and keyboard noise
+_HALLUCINATIONS = {
+    "thank you", "thanks", "thank you very much", "thanks for watching",
+    "thank you for watching", "please subscribe", "bye", "bye bye", "you",
+    "i didn't quite catch that", "amara org", "subtitles by the amara org community",
+    "oh", "hmm", "uh", "um",
+}
+# Segment confidence limits: likely silence, or a guess
+NO_SPEECH_MAX = 0.6
+AVG_LOGPROB_MIN = -1.0
+
+
+def _normalise(text: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9' ]+", " ", text.lower()).split())
+
+
+def is_hallucination(text: str) -> bool:
+    """True for empty/punctuation-only text and Whisper's stock phantom phrases."""
+    norm = _normalise(text)
+    return not norm or norm in _HALLUCINATIONS or norm.startswith("subtitles by")
+
+
+def keep_segment(segment: Any) -> bool:
+    """Drop segments Whisper itself thinks are silence or a low-confidence guess."""
+    no_speech = float(getattr(segment, "no_speech_prob", 0.0) or 0.0)
+    logprob = float(getattr(segment, "avg_logprob", 0.0) or 0.0)
+    return no_speech <= NO_SPEECH_MAX and logprob >= AVG_LOGPROB_MIN
+
 
 class SpeechToText:
     """Local Speech-to-Text using faster-whisper (VOI-01)."""
@@ -53,25 +86,31 @@ class SpeechToText:
     async def transcribe(self, audio: np.ndarray, cancel_token: CancelToken) -> str:
         """Transcribe an audio chunk. Audio must be 16kHz float32."""
         cancel_token.raise_if_cancelled()
-        
+
         # Run transcription in a thread pool to avoid blocking the event loop
         loop = asyncio.get_running_loop()
-        
+
         def _transcribe_sync() -> str:
-            segments, _ = self.model.transcribe(audio, beam_size=5, language=self.language)
-            text = "".join(segment.text for segment in segments)
+            segments, _ = self.model.transcribe(
+                audio,
+                beam_size=5,
+                language=self.language,
+                # Whisper's own VAD trims non-speech, and not conditioning on
+                # previous text stops one phantom phrase from seeding the next
+                vad_filter=True,
+                condition_on_previous_text=False,
+            )
+            text = "".join(segment.text for segment in segments if keep_segment(segment))
             return text.strip()
 
         try:
             text = await loop.run_in_executor(None, _transcribe_sync)
             cancel_token.raise_if_cancelled()
-            
-            # Filter common Whisper hallucinations
+
             clean_text = text.strip()
-            hallucinations = ["Thank you.", "I didn't quite catch that.", "Bye.", "Thanks for watching!", "Amara.org", "You", "Thank you", ".", ". . . ."]
-            if clean_text in hallucinations:
+            if is_hallucination(clean_text):
                 return ""
-            
+
             return clean_text
         except asyncio.CancelledError:
             raise

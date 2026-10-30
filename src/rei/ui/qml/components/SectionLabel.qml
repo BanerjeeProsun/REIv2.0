@@ -2,14 +2,10 @@ import QtQuick
 import QtQuick.Layouts
 import ".."
 
-// Small uppercase label that introduces a group of cards.
-Text {
+// Group heading above a set of cards (DESIGN.md product label, 19px/600).
+ReiText {
     Layout.fillWidth: true
     Layout.topMargin: Theme.s16
-    color: Theme.textMuted
-    font.family: Theme.fontText
-    font.pixelSize: Theme.sizeCaption
-    font.weight: Font.DemiBold
-    font.capitalization: Font.AllUppercase
-    font.letterSpacing: 1.2
+    role: "productLabel"
+    color: Theme.porcelain
 }

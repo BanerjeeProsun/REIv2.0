@@ -5,12 +5,14 @@ from rei.policy.schemas import PrivacyMode
 from rei.capabilities.spec import DataClass
 from rei.egress.redactor import Redactor
 from rei.policy.config import PolicyConfig
-from rei.egress.socket_guard import EgressBlockedError
+from rei.egress.socket_guard import EgressBlockedError as EgressBlockedError
+
 
 @dataclass
 class EgressPayloadPart:
     data_class: DataClass
     content: Any
+
 
 @dataclass
 class EgressRequest:
@@ -19,6 +21,7 @@ class EgressRequest:
     payload: list[EgressPayloadPart]
     turn_id: str
     consent_ref: str | None = None
+
 
 # Modes in which user-approved connector hosts may be contacted
 CONNECTOR_MODES = (PrivacyMode.LOCAL_PLUS_WEB, PrivacyMode.CLOUD_ASSISTED)
@@ -64,7 +67,7 @@ class EgressGate:
             raise EgressBlockedError(f"Host {destination} not allowed in mode {self.current_mode.value}")
 
     def _require_valid_consent(self, consent_ref: str | None) -> None:
-        if not consent_ref: # simplified consent check
+        if not consent_ref:  # simplified consent check
             raise EgressBlockedError("Missing valid consent for C2 data")
 
     def check_host(self, destination: str, purpose: str) -> None:
@@ -81,32 +84,41 @@ class EgressGate:
     async def send(self, req: EgressRequest) -> Any:
         self._assert_mode_allows(req)
         self._assert_host_allowlisted(req.destination)
-        
+
         max_class = DataClass.C0
         raw_payloads = []
         for part in req.payload:
             if part.data_class.value > max_class.value:
                 max_class = part.data_class
             raw_payloads.append(part.content)
-            
+
         if max_class == DataClass.C3:
             raise EgressBlockedError("SECRET data (C3) cannot leave the device")
-            
+
         if max_class == DataClass.C2:
             self._require_valid_consent(req.consent_ref)
-            
+
         # Redact payload
         redacted_payload, found_secret = self.redactor.redact_payload(raw_payloads)
         if found_secret:
             raise EgressBlockedError("SECRET data (C3) detected during redaction")
-            
+
         # In a real app, record to ledger and send via httpx
         payload_digest = hashlib.sha256(str(redacted_payload).encode()).hexdigest()
         print(f"Ledger record: Sent data to {req.destination} for {req.purpose}. Digest: {payload_digest}")
-        
+
         return {"status": "mock_sent", "digest": payload_digest}
 
-    async def post_http(self, destination: str, purpose: str, url: str, headers: dict[str, str], json_body: dict[str, Any], timeout: Any = None, data_class: DataClass = DataClass.C0) -> Any:
+    async def post_http(
+        self,
+        destination: str,
+        purpose: str,
+        url: str,
+        headers: dict[str, str],
+        json_body: dict[str, Any],
+        timeout: Any = None,
+        data_class: DataClass = DataClass.C0,
+    ) -> Any:
         import httpx
         req = EgressRequest(
             destination=destination,
@@ -116,19 +128,19 @@ class EgressGate:
         )
         self._assert_mode_allows(req)
         self._assert_host_allowlisted(req.destination)
-        
+
         if data_class == DataClass.C3:
             raise EgressBlockedError("SECRET data (C3) cannot leave the device")
-            
+
         if data_class == DataClass.C2:
             self._require_valid_consent(None)
-            
+
         redacted_payload, found_secret = self.redactor.redact_payload(json_body)
         if found_secret:
             raise EgressBlockedError("SECRET data (C3) detected during redaction")
-            
+
         payload_digest = hashlib.sha256(str(redacted_payload).encode()).hexdigest()
         print(f"Ledger record: Sent HTTP POST to {url} for {purpose}. Digest: {payload_digest}")
-        
+
         async with httpx.AsyncClient(timeout=timeout) as client:
             return await client.post(url, headers=headers, json=redacted_payload)

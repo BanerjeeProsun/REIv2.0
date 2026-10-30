@@ -2,7 +2,8 @@ import QtQuick
 import QtQuick.Layouts
 import ".."
 
-// Labelled text field (8px radius) with an animated coral focus ring.
+// Labelled text field in the DESIGN.md Device Selector style: faint white fill,
+// 1px Slate outline, fully round, Apple Blue focus outline.
 ColumnLayout {
     id: root
     property string label: ""
@@ -15,50 +16,53 @@ ColumnLayout {
     Layout.fillWidth: true
     spacing: Theme.s8
 
-    Text {
+    ReiText {
         visible: root.label !== ""
+        Layout.leftMargin: Theme.s4
+        role: "bodyStrong"
         text: root.label
-        color: field.activeFocus ? Theme.textPrimary : Theme.textSecondary
-        font.family: Theme.fontText
-        font.pixelSize: Theme.sizeBodySm
-        font.weight: Font.Medium
-        Behavior on color { ColorAnimation { duration: Theme.fast } }
+        color: field.activeFocus ? Theme.porcelain : Theme.ash
     }
 
     Rectangle {
+        id: shape
         Layout.fillWidth: true
-        implicitHeight: 52
-        radius: Theme.radiusInput + 4
-        color: field.activeFocus ? Theme.elevatedHover : hover.hovered ? Qt.darker(Theme.elevatedHover, 1.06) : Theme.elevated
+        implicitHeight: 48
+        radius: height / 2
+        color: hover.hovered && !field.activeFocus ? Theme.fieldFillHover : Theme.fieldFill
         border.width: 1
-        border.color: field.activeFocus ? Theme.coralAlpha(0.65) : "transparent"
+        border.color: hover.hovered || field.activeFocus ? Theme.ash : Theme.slate
         Behavior on color { ColorAnimation { duration: Theme.fast } }
         Behavior on border.color { ColorAnimation { duration: Theme.fast } }
 
         HoverHandler { id: hover; cursorShape: Qt.IBeamCursor }
+        TapHandler { onTapped: field.forceActiveFocus() }
+        FocusRing { shown: field.activeFocus; baseRadius: shape.radius }
 
         TextInput {
             id: field
             anchors.fill: parent
-            anchors.leftMargin: Theme.s16
-            anchors.rightMargin: Theme.s16
+            anchors.leftMargin: Theme.s24
+            anchors.rightMargin: Theme.s24
             verticalAlignment: TextInput.AlignVCenter
-            color: Theme.textPrimary
-            selectionColor: Theme.coralAlpha(0.45)
-            selectedTextColor: Theme.textPrimary
+            color: Theme.porcelain
+            selectionColor: Theme.alpha(Theme.appleBlue, 0.55)
+            selectedTextColor: Theme.white
             font.family: Theme.fontText
-            font.pixelSize: Theme.sizeBody
+            font.pixelSize: Theme.type.reading.size
+            font.letterSpacing: Theme.type.reading.tracking
             clip: true
+            activeFocusOnTab: true
             echoMode: root.secret ? TextInput.Password : TextInput.Normal
             passwordCharacter: "•"
             onAccepted: root.accepted()
 
-            Text {
+            ReiText {
                 anchors.verticalCenter: parent.verticalCenter
+                role: "reading"
                 text: root.placeholder
-                color: Theme.textMuted
+                color: Theme.ash
                 visible: field.text.length === 0
-                font: field.font
             }
         }
     }

@@ -2,17 +2,17 @@ import QtQuick
 import QtQuick.Layouts
 import ".."
 
-// Pill tag for categories and status (100px radius, 12px medium text).
+// Small translucent pill for categories and status (12px, fully round).
 Rectangle {
     id: root
     property string text: ""
-    property color ink: Theme.textSecondary
-    property color fill: Qt.rgba(1, 1, 1, 0.05)
+    property color ink: Theme.ash
+    property color fill: Theme.alpha(Theme.steel, 0.6)
     property bool dot: false
     property color dotColor: ink
 
     implicitHeight: 24
-    implicitWidth: row.implicitWidth + 20
+    implicitWidth: row.implicitWidth + 2 * Theme.s10
     Layout.preferredWidth: implicitWidth
     Layout.preferredHeight: implicitHeight
     Layout.alignment: Qt.AlignVCenter
@@ -22,20 +22,20 @@ Rectangle {
     RowLayout {
         id: row
         anchors.centerIn: parent
-        spacing: 6
+        spacing: Theme.s6
         Rectangle {
             visible: root.dot
-            width: 6; height: 6; radius: 3
+            Layout.preferredWidth: 6
+            Layout.preferredHeight: 6
+            radius: 3
             color: root.dotColor
             Layout.alignment: Qt.AlignVCenter
         }
-        Text {
+        ReiText {
+            Layout.alignment: Qt.AlignVCenter
+            role: "utilityNav"
             text: root.text
             color: root.ink
-            font.family: Theme.fontText
-            font.pixelSize: Theme.sizeCaption
-            font.weight: Font.Medium
-            Layout.alignment: Qt.AlignVCenter
         }
     }
 }

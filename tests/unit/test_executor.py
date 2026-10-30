@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 from unittest.mock import patch
 from rei.core.executor import Executor, ExecutorError
@@ -10,24 +11,28 @@ from rei.capabilities.registry import CapabilityRegistry
 from rei.capabilities.builtin import register_builtin
 from rei.capabilities.builtin.media import SetVolumeArgs
 
+
 @pytest.fixture
 def registry() -> CapabilityRegistry:
     reg = CapabilityRegistry()
     register_builtin(reg)
     return reg
 
+
 @pytest.fixture
 def engine(registry: CapabilityRegistry) -> PolicyEngine:
     return PolicyEngine(registry, {}, b"test_key")
+
 
 @pytest.fixture
 def executor(registry: CapabilityRegistry) -> Executor:
     verifier = GrantVerifier(registry, b"test_key")
     return Executor(registry, verifier)
 
+
 @patch("rei.capabilities.builtin.media.AudioUtilities", create=True)
 @patch("rei.capabilities.builtin.media.cast", create=True)
-def test_executor_valid_grant(mock_cast, mock_audio, engine: PolicyEngine, executor: Executor) -> None:
+def test_executor_valid_grant(mock_cast: Any, mock_audio: Any, engine: PolicyEngine, executor: Executor) -> None:
     # Mock pycaw so we don't change real system volume
     mock_volume = mock_cast.return_value
     mock_volume.SetMasterVolumeLevelScalar = lambda *a: None
@@ -43,16 +48,17 @@ def test_executor_valid_grant(mock_cast, mock_audio, engine: PolicyEngine, execu
     )
     decision = engine.decide(intent, ctx)
     token, mac = engine.issue_grant(intent, ctx, decision)
-    
+
     # Execution should succeed
     args = SetVolumeArgs(level=50)
     result = executor.execute(token, args, mac)
     assert result["status"] == "success"
-    
+
     # Replay should fail
     with pytest.raises(ExecutorError, match="Token already consumed"):
         executor.execute(token, args, mac)
-        
+
+
 def test_executor_tampered_mac(engine: PolicyEngine, executor: Executor) -> None:
     intent = IntentProposal(
         type="intent", capability="media.set_volume", capability_version=1,
@@ -65,7 +71,7 @@ def test_executor_tampered_mac(engine: PolicyEngine, executor: Executor) -> None
     )
     decision = engine.decide(intent, ctx)
     token, mac = engine.issue_grant(intent, ctx, decision)
-    
+
     args = SetVolumeArgs(level=50)
     # Tampered mac
     with pytest.raises(ExecutorError, match="Invalid MAC"):

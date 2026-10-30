@@ -61,14 +61,16 @@ system_power_spec = CapabilitySpec(
 def system_power_handler(args: SystemPowerArgs) -> dict[str, str]:
     import os
     if args.action == "shutdown":
-        os.system("shutdown /s /t 1")
+        os.system("shutdown /s /t 1")  # noqa: S605, S607
     elif args.action == "restart":
-        os.system("shutdown /r /t 1")
+        os.system("shutdown /r /t 1")  # noqa: S605, S607
     return {"status": "success", "action": args.action}
+
 
 class TypeTextArgs(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     text: str = Field(..., max_length=1000)
+
 
 system_type_text_spec = CapabilitySpec(
     id="system.type_text",
@@ -86,6 +88,7 @@ system_type_text_spec = CapabilitySpec(
     rate_limit=RateLimit(limit=50, period_s=60),
     modes=frozenset([PrivacyMode.LOCAL_ONLY, PrivacyMode.LOCAL_PLUS_WEB, PrivacyMode.CLOUD_ASSISTED]),
 )
+
 
 def system_type_text_handler(args: TypeTextArgs) -> dict[str, str]:
     from rei.capabilities.builtin import _win_input as win

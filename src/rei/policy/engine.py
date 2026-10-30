@@ -18,7 +18,7 @@ class PolicyEngine:
         self.config = config
         self.grant_key = grant_key
         self.policy_version = config.get("version", "unknown")
-        
+
         self._usage: dict[str, list[float]] = {}
         self._parsed_rate_limits: dict[str, tuple[int, int]] = {}
         self._parse_config_rate_limits()
@@ -31,8 +31,8 @@ class PolicyEngine:
                 limit = int(limit_str)
                 period_s = 60 if period_str == "min" else 3600 if period_str == "hour" else 1
                 self._parsed_rate_limits[cap] = (limit, period_s)
-            except Exception:
-                pass
+            except (ValueError, AttributeError):
+                continue
 
     def decide(self, intent: IntentProposal, ctx: PolicyContext) -> PolicyDecision:
         try:
@@ -41,43 +41,43 @@ class PolicyEngine:
                 spec = self.registry.get_spec(intent.capability)
             except UnknownCapabilityError:
                 return self._deny("UNKNOWN_CAPABILITY")
-                
+
             if spec.version != intent.capability_version:
                 return self._deny("VERSION_MISMATCH")
-                
+
             try:
                 spec.args_model.model_validate(intent.args)
             except Exception:
                 return self._deny("SCHEMA_INVALID")
-                
+
             # 2. Kill switches
             if self.config.get("defaults", {}).get("safe_mode"):
                 return self._deny("SAFE_MODE")
-            
+
             disabled = self.config.get("disabled", {}).get("capabilities", [])
             if intent.capability in disabled:
                 return self._deny("CAPABILITY_DISABLED")
-                
+
             if ctx.privacy_mode not in spec.modes:
                 return self._deny("MODE_NOT_ALLOWED")
-                
+
             # 3. Origin
-            if ctx.origin == Origin.WORKER and not getattr(spec, "worker_allowed", False): 
-                # The capability spec doesn't have worker_allowed explicitly in the snippet 
+            if ctx.origin == Origin.WORKER and not getattr(spec, "worker_allowed", False):
+                # The capability spec doesn't have worker_allowed explicitly in the snippet
                 # but it's an architecture rule.
                 # Let's say if we didn't add it, we check if it's there.
                 return self._deny("ORIGIN_WORKER_NOT_ALLOWED")
-                
+
             # 4. Taint
             if ctx.taint and not spec.allow_when_tainted:
                 return self._deny("TAINTED_BLOCKED")
-                
+
             # 5. Data egress
             if spec.network:
                 # Egress pre-check mock
                 if ctx.privacy_mode.value == "LOCAL_ONLY":
                     return self._deny("EGRESS_BLOCKED_LOCAL_ONLY")
-                    
+
             # 6. Rate limits
             now = time.time()
             if intent.capability in self._parsed_rate_limits:
@@ -86,39 +86,39 @@ class PolicyEngine:
                 limit, period_s = spec.rate_limit.limit, spec.rate_limit.period_s
             else:
                 limit, period_s = 9999, 1
-                
+
             history = self._usage.get(intent.capability, [])
             history = [t for t in history if now - t < period_s]
             self._usage[intent.capability] = history
-            
+
             if len(history) >= limit:
                 return self._deny("RATE_LIMITED")
-                
+
             # 7 & 8 & 9. Base tier, Escalation, Pre-authorisation
             pre_auths = self.config.get("preauthorise", {}).get("allowed", [])
             is_pre_auth = (
-                intent.capability in pre_auths 
-                and ctx.origin in (Origin.USER_VOICE, Origin.USER_TYPED) 
+                intent.capability in pre_auths
+                and ctx.origin in (Origin.USER_VOICE, Origin.USER_TYPED)
                 and not ctx.taint
             )
-            
+
             if spec.tier in (RiskTier.R0, RiskTier.R1):
                 if ctx.taint:
                     return self._escalate(ConfirmLevel.VOICE_OR_CLICK, "TAINT_ESCALATION")
                 return self._allow()
-                
+
             elif spec.tier == RiskTier.R2:
                 if is_pre_auth:
                     return self._allow()
                 if ctx.taint:
                     return self._escalate(ConfirmLevel.CLICK, "TAINT_ESCALATION")
                 return self._escalate(ConfirmLevel.VOICE_OR_CLICK, "TIER_R2")
-                
+
             elif spec.tier == RiskTier.R3:
                 if ctx.taint:
                     return self._escalate(ConfirmLevel.CLICK_WITH_REVIEW, "TAINT_ESCALATION")
                 return self._escalate(ConfirmLevel.CLICK, "TIER_R3")
-                
+
             # 10. Default
             return self._deny("NO_RULE")
 
@@ -132,12 +132,12 @@ class PolicyEngine:
         # Record usage for rate limiting
         history = self._usage.setdefault(intent.capability, [])
         history.append(time.time())
-        
+
         # Single-use bound token
         spec = self.registry.get_spec(intent.capability)
-        
+
         args_sha256 = hashlib.sha256(self._canonical_json(intent.args)).hexdigest()
-        
+
         token = GrantToken(
             grant_id=str(uuid.uuid4()),
             turn_id=ctx.turn_id,
@@ -151,7 +151,7 @@ class PolicyEngine:
             expires_at=time.time() + 30.0,
             nonce=uuid.uuid4().hex
         )
-        
+
         mac = self._compute_mac(token)
         return token, mac
 
@@ -164,9 +164,9 @@ class PolicyEngine:
 
     def _deny(self, reason: str) -> PolicyDecision:
         return PolicyDecision(Verdict.DENY, None, (reason,), self.policy_version)
-        
+
     def _allow(self) -> PolicyDecision:
         return PolicyDecision(Verdict.ALLOW, None, ("ALLOW",), self.policy_version)
-        
+
     def _escalate(self, level: ConfirmLevel, reason: str) -> PolicyDecision:
         return PolicyDecision(Verdict.CONFIRM, level, (reason,), self.policy_version)

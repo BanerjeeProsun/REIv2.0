@@ -29,17 +29,20 @@ media_set_volume_spec = CapabilitySpec(
 
 def media_set_volume_handler(args: SetVolumeArgs) -> dict[str, str | int]:
     from ctypes import cast, POINTER
-    from comtypes import CLSCTX_ALL # type: ignore
-    from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume # type: ignore
+    from comtypes import CLSCTX_ALL  # type: ignore
+    from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume  # type: ignore
 
     devices = AudioUtilities.GetSpeakers()
-    interface = devices.EndpointVolume if hasattr(devices, "EndpointVolume") else devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+    if hasattr(devices, "EndpointVolume"):
+        interface = devices.EndpointVolume
+    else:
+        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
     volume = cast(interface, POINTER(IAudioEndpointVolume))
-    
+
     # pycaw uses a scalar from 0.0 to 1.0
     scalar = args.level / 100.0
     volume.SetMasterVolumeLevelScalar(scalar, None)
-    
+
     return {"status": "success", "volume": args.level}
 
 
@@ -89,7 +92,7 @@ def media_control_handler(args: MediaControlArgs) -> dict[str, str]:
     VK_MEDIA_PREV_TRACK = 0xB1
     VK_MEDIA_PLAY_PAUSE = 0xB3
     VK_MEDIA_STOP = 0xB2
-    
+
     key_map = {
         "play": VK_MEDIA_PLAY_PAUSE,
         "pause": VK_MEDIA_PLAY_PAUSE,
@@ -97,10 +100,10 @@ def media_control_handler(args: MediaControlArgs) -> dict[str, str]:
         "prev": VK_MEDIA_PREV_TRACK,
         "stop": VK_MEDIA_STOP,
     }
-    
+
     vk = key_map.get(args.action)
     if vk:
         ctypes.windll.user32.keybd_event(vk, 0, 0, 0)
-        ctypes.windll.user32.keybd_event(vk, 0, 2, 0) # Key up
-        
+        ctypes.windll.user32.keybd_event(vk, 0, 2, 0)  # Key up
+
     return {"status": "success", "action": args.action, "spoken": spoken}

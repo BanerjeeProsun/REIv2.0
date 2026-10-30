@@ -1,3 +1,4 @@
+from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 from rei.capabilities.spec import CapabilitySpec, RiskTier, DataClass, RateLimit
 from rei.policy.schemas import PrivacyMode
@@ -27,11 +28,13 @@ memory_remember_spec = CapabilitySpec(
 )
 
 # Global store reference to be injected at startup
-_store = None
+_store: Any = None
 
-def set_memory_store(store) -> None:
+
+def set_memory_store(store: Any) -> None:
     global _store
     _store = store
+
 
 def memory_remember_handler(args: RememberArgs) -> dict[str, str]:
     if not _store:

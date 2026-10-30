@@ -2,7 +2,11 @@ import QtQuick
 import QtQuick.Layouts
 import ".."
 
-// Pill button. variant: "primary" (coral CTA), "outline", "ghost".
+// Pill button (DESIGN.md: buttons are fully round, never rectangular).
+// variant: "primary"  - Apple Blue fill, the one primary action in a group
+//          "outline"  - Outlined Explore Pill: 1px Slate, Porcelain text
+//          "capsule"  - Dark Pricing Capsule: translucent graphite fill
+//          "ghost"    - text-only Electric Link
 Item {
     id: root
     property string text: ""
@@ -13,62 +17,66 @@ Item {
 
     readonly property bool hasIcon: iconSource.toString() !== ""
     readonly property bool hovered: mouse.containsMouse && root.enabled
+    readonly property bool pressed: mouse.pressed && root.enabled
 
-    implicitHeight: small ? 32 : 40
-    implicitWidth: row.implicitWidth + (small ? 28 : 40)
+    implicitHeight: small ? 30 : 38
+    implicitWidth: row.implicitWidth + (small ? 28 : 36)
     Layout.preferredWidth: implicitWidth
     Layout.preferredHeight: implicitHeight
     activeFocusOnTab: root.enabled
+    opacity: root.enabled ? 1 : 0.4
+    Behavior on opacity { NumberAnimation { duration: Theme.fast } }
 
     readonly property color fill: {
-        if (!root.enabled) return variant === "primary" ? Theme.elevated : "transparent"
-        if (variant === "primary") return mouse.pressed ? Theme.coralPressed : hovered ? Theme.coralHover : Theme.coral
-        if (variant === "outline") return hovered ? Theme.elevated : "transparent"
-        return hovered ? Theme.elevated : "transparent"
+        if (variant === "primary") return pressed ? Theme.appleBluePressed : hovered ? Theme.appleBlueHover : Theme.appleBlue
+        if (variant === "capsule") return hovered ? Theme.capsuleHover : Theme.capsule
+        if (variant === "outline") return hovered ? Theme.hoverFill : "transparent"
+        return "transparent"
     }
-    readonly property color ink: !root.enabled ? Theme.textMuted
-                               : variant === "primary" ? Theme.textPrimary
-                               : hovered ? Theme.textPrimary : Theme.textBody
+    readonly property color ink: variant === "primary" ? Theme.white
+                               : variant === "ghost" ? Theme.electricLink
+                               : variant === "capsule" ? (hovered ? Theme.porcelain : Theme.navInk)
+                               : Theme.porcelain
 
     Rectangle {
+        id: shape
         anchors.fill: parent
         radius: height / 2
         color: root.fill
-        border.width: root.variant === "outline" || root.activeFocus ? 1 : 0
-        border.color: root.activeFocus ? Theme.coralAlpha(0.7)
-                    : root.hovered ? Theme.hairlineStrong : Theme.hairline
+        border.width: root.variant === "outline" ? 1 : 0
+        border.color: root.hovered ? Theme.porcelain : Theme.slate
         Behavior on color { ColorAnimation { duration: Theme.fast } }
         Behavior on border.color { ColorAnimation { duration: Theme.fast } }
     }
+    FocusRing { shown: root.activeFocus; baseRadius: shape.radius }
 
     RowLayout {
         id: row
         anchors.centerIn: parent
-        spacing: 8
+        spacing: Theme.s6
         Icon {
             visible: root.hasIcon
             source: root.iconSource
-            size: root.small ? 14 : 16
+            size: root.small ? 13 : 15
             Layout.alignment: Qt.AlignVCenter
             color: root.ink
         }
-        Text {
+        ReiText {
             visible: root.text !== ""
             Layout.alignment: Qt.AlignVCenter
+            role: root.small ? "utilityNav" : "body"
             text: root.text
             color: root.ink
-            font.family: Theme.fontText
-            font.pixelSize: root.small ? 13 : Theme.sizeBodySm
-            font.weight: Font.DemiBold
-            font.letterSpacing: Theme.tracking(Theme.sizeBodySm) / 2
-            Behavior on color { ColorAnimation { duration: Theme.fast } }
+            font.weight: root.variant === "primary" || root.variant === "outline" ? 500 : 400
+            font.underline: root.variant === "ghost" && root.hovered
         }
     }
 
-    scale: mouse.pressed && root.enabled ? 0.96 : 1
-    Behavior on scale { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
+    scale: root.pressed ? 0.97 : 1
+    Behavior on scale { NumberAnimation { duration: Theme.exit; easing.type: Easing.OutCubic } }
 
     Keys.onReturnPressed: if (root.enabled) root.clicked()
+    Keys.onEnterPressed: if (root.enabled) root.clicked()
     Keys.onSpacePressed: if (root.enabled) root.clicked()
 
     MouseArea {

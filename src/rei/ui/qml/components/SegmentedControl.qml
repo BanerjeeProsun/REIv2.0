@@ -2,20 +2,29 @@ import QtQuick
 import QtQuick.Layouts
 import ".."
 
-// Two-or-more option pill switch with a sliding thumb.
+// Pill switch with a sliding Steel thumb on a Graphite track.
+// Display-only: it emits selected(index) and shows currentIndex, so a caller
+// that asks for confirmation first simply keeps currentIndex bound.
 Rectangle {
     id: root
     property var options: []
     property int currentIndex: 0
     signal selected(int index)
 
-    property int segmentWidth: 128
+    property int segmentWidth: 112
     implicitWidth: segmentWidth * options.length + 8
-    implicitHeight: 40
+    implicitHeight: 36
     Layout.preferredWidth: implicitWidth
     Layout.preferredHeight: implicitHeight
     radius: height / 2
-    color: Theme.recessed
+    color: Theme.graphite
+    border.width: 1
+    border.color: Theme.steel
+    activeFocusOnTab: true
+
+    Keys.onLeftPressed: if (currentIndex > 0) selected(currentIndex - 1)
+    Keys.onRightPressed: if (currentIndex < options.length - 1) selected(currentIndex + 1)
+    FocusRing { shown: root.activeFocus; baseRadius: root.radius }
 
     Rectangle {
         id: thumb
@@ -24,8 +33,7 @@ Rectangle {
         width: root.segmentWidth
         height: parent.height - 8
         radius: height / 2
-        color: Theme.elevatedHover
-        border.color: Theme.hairlineStrong
+        color: Theme.steel
         Behavior on x { NumberAnimation { duration: Theme.page; easing.type: Easing.OutCubic } }
     }
 
@@ -36,16 +44,14 @@ Rectangle {
             model: root.options
             Item {
                 width: root.segmentWidth
-                height: 32
+                height: 28
                 readonly property bool isCurrent: index === root.currentIndex
-                Text {
+                ReiText {
                     anchors.centerIn: parent
+                    role: "utilityNav"
                     text: modelData
-                    color: parent.isCurrent ? Theme.textPrimary : segMouse.containsMouse ? Theme.textBody : Theme.textSecondary
-                    font.family: Theme.fontText
-                    font.pixelSize: 13
-                    font.weight: Font.DemiBold
-                    Behavior on color { ColorAnimation { duration: Theme.fast } }
+                    color: parent.isCurrent || segMouse.containsMouse ? Theme.porcelain : Theme.ash
+                    font.weight: parent.isCurrent ? 600 : 400
                 }
                 MouseArea {
                     id: segMouse
