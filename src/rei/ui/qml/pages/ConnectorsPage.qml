@@ -20,7 +20,8 @@ PageScaffold {
     // Local Only blocks all network access, including connectors
     SurfaceCard {
         visible: page.offline
-        padding: 20
+        outlined: true
+        padding: Theme.s20
         RowLayout {
             Layout.fillWidth: true
             spacing: Theme.s16
@@ -28,22 +29,22 @@ PageScaffold {
                 Layout.alignment: Qt.AlignVCenter
                 source: Qt.resolvedUrl("../icons/local.svg")
                 size: 20
-                color: Theme.coral
+                color: Theme.porcelain
             }
-            Text {
+            ReiText {
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignVCenter
+                role: "body"
                 text: "You're in Local Only mode, so connectors can't go online."
-                color: Theme.textBody
-                font.family: Theme.fontText
-                font.pixelSize: Theme.sizeBodySm
+                color: Theme.porcelain
                 wrapMode: Text.WordWrap
             }
             PillButton {
                 text: "Use Local + Connectors"
                 small: true
-                variant: "primary"
-                onClicked: backend.setPrivacyMode("Local + Connectors")
+                variant: "capsule"
+                // Opens the privacy dialog; nothing changes until confirmed
+                onClicked: backend.requestPrivacyMode("Local + Connectors")
             }
         }
     }
@@ -66,7 +67,8 @@ PageScaffold {
             Tag {
                 text: row.connected ? "Connected" : "Not connected"
                 dot: true
-                dotColor: row.connected ? Theme.coral : Theme.textMuted
+                dotColor: row.connected ? Theme.porcelain : Theme.ash
+                ink: row.connected ? Theme.porcelain : Theme.ash
             }
             PillButton {
                 text: row.connected ? "Disconnect" : "Connect"
@@ -82,25 +84,22 @@ PageScaffold {
     }
 
     // CONNECT FORM
-    Popup {
+    ReiDialog {
         id: connectDialog
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        width: Math.min(460, parent ? parent.width - 80 : 460)
-        padding: 28
-        modal: true
-        focus: true
-        closePolicy: Popup.CloseOnEscape
+        title: "Connect " + name
+        subtitle: note
+        preferredWidth: 480
+        escClosable: !busy
 
         property string cid: ""
-        property string title: ""
+        property string name: ""
         property var fields: []
         property string note: ""
         property bool busy: false
         property string errorText: ""
 
-        function openFor(id, name, fieldList, noteText) {
-            cid = id; title = name; fields = fieldList; note = noteText
+        function openFor(id, connectorName, fieldList, noteText) {
+            cid = id; name = connectorName; fields = fieldList; note = noteText || ""
             busy = false; errorText = ""
             open()
         }
@@ -113,77 +112,39 @@ PageScaffold {
             busy = true; errorText = ""
             backend.connectConnector(cid, JSON.stringify(values))
         }
+        onOpened: if (fieldRepeater.count > 0) fieldRepeater.itemAt(0).input.forceActiveFocus()
 
-        Overlay.modal: Rectangle { color: Qt.rgba(8 / 255, 8 / 255, 14 / 255, 0.6) }
-        enter: Transition {
-            ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.page; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "scale"; from: 0.96; to: 1; duration: Theme.page; easing.type: Easing.OutCubic }
+        Repeater {
+            id: fieldRepeater
+            model: connectDialog.fields
+            InputField {
+                required property var modelData
+                readonly property string key: modelData.key
+                label: modelData.label + (modelData.optional ? " (optional)" : "")
+                placeholder: modelData.placeholder
+                secret: modelData.secret
+                onAccepted: connectDialog.submit()
             }
         }
-        exit: Transition { NumberAnimation { property: "opacity"; to: 0; duration: Theme.exit } }
-        background: Rectangle { color: Theme.elevated; radius: Theme.radiusCard; border.color: Theme.hairline }
 
-        contentItem: ColumnLayout {
-            spacing: 18
-
-            Text {
-                Layout.fillWidth: true
-                text: "Connect " + connectDialog.title
-                color: Theme.textPrimary
-                font.family: Theme.fontDisplay
-                font.pixelSize: Theme.sizeHeadingSm
-                font.weight: Font.DemiBold
-                font.letterSpacing: Theme.tracking(Theme.sizeHeadingSm)
-            }
-            Text {
-                Layout.fillWidth: true
-                visible: connectDialog.note !== ""
-                text: connectDialog.note
-                color: Theme.textSecondary
-                font.family: Theme.fontText
-                font.pixelSize: Theme.sizeBodySm
-                lineHeight: 1.3
-                wrapMode: Text.WordWrap
-            }
-
-            Repeater {
-                id: fieldRepeater
-                model: connectDialog.fields
-                InputField {
-                    required property var modelData
-                    readonly property string key: modelData.key
-                    label: modelData.label + (modelData.optional ? " (optional)" : "")
-                    placeholder: modelData.placeholder
-                    secret: modelData.secret
-                    onAccepted: connectDialog.submit()
-                }
-            }
-
-            Text {
-                Layout.fillWidth: true
-                visible: connectDialog.errorText !== ""
-                text: connectDialog.errorText
-                color: Theme.coral
-                font.family: Theme.fontText
-                font.pixelSize: Theme.sizeBodySm
-                wrapMode: Text.WordWrap
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.topMargin: 4
-                spacing: 8
-                Item { Layout.fillWidth: true }
-                PillButton { text: "Cancel"; variant: "ghost"; onClicked: connectDialog.close() }
-                PillButton {
-                    text: connectDialog.busy ? "Connecting..." : "Connect"
-                    variant: "primary"
-                    enabled: !connectDialog.busy
-                    onClicked: connectDialog.submit()
-                }
-            }
+        ReiText {
+            Layout.fillWidth: true
+            visible: connectDialog.errorText !== ""
+            role: "body"
+            text: connectDialog.errorText
+            color: Theme.alert
+            wrapMode: Text.WordWrap
         }
+
+        buttons: [
+            PillButton { text: "Cancel"; variant: "outline"; onClicked: connectDialog.close() },
+            PillButton {
+                text: connectDialog.busy ? "Connecting…" : "Connect"
+                variant: "primary"
+                enabled: !connectDialog.busy
+                onClicked: connectDialog.submit()
+            }
+        ]
 
         Connections {
             target: backend

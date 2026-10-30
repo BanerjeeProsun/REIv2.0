@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import ".."
 
-// Card row: icon tile, title + description, trailing control.
+// Card row: black icon tile, title + description, trailing control.
 // The text column fills the space between icon and control and wraps, so it
 // can never overflow the card.
 SurfaceCard {
@@ -13,46 +13,45 @@ SurfaceCard {
     // Children given by users of SettingRow become the trailing controls
     default property alias trailing: trailingRow.data
 
+    padding: Theme.s20
+
     content: RowLayout {
         Layout.fillWidth: true
         spacing: Theme.s16
 
         Rectangle {
             visible: root.iconSource.toString() !== ""
-            Layout.preferredWidth: 44
-            Layout.preferredHeight: 44
+            Layout.preferredWidth: 40
+            Layout.preferredHeight: 40
             Layout.alignment: Qt.AlignVCenter
-            radius: 12
-            color: Qt.rgba(1, 1, 1, 0.05)
+            radius: Theme.radiusLink + 2
+            color: Theme.obsidian
+            border.width: 1
+            border.color: Theme.steel
             Icon {
                 anchors.centerIn: parent
                 source: root.iconSource
-                size: 20
-                color: Theme.textBody
+                size: 18
+                color: Theme.porcelain
             }
         }
 
         ColumnLayout {
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignVCenter
-            spacing: 4
-            Text {
+            spacing: 2
+            ReiText {
                 Layout.fillWidth: true
+                role: "sectionNav"
                 text: root.title
-                color: Theme.textPrimary
-                font.family: Theme.fontText
-                font.pixelSize: Theme.sizeBody
-                font.weight: Font.DemiBold
                 elide: Text.ElideRight
             }
-            Text {
+            ReiText {
                 visible: root.description !== ""
                 Layout.fillWidth: true
+                role: "body"
                 text: root.description
-                color: Theme.textSecondary
-                font.family: Theme.fontText
-                font.pixelSize: Theme.sizeBodySm
-                lineHeight: 1.3
+                color: Theme.ash
                 wrapMode: Text.WordWrap
             }
         }

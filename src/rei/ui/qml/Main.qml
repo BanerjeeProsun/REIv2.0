@@ -11,20 +11,23 @@ ApplicationWindow {
     minimumWidth: 880
     minimumHeight: 600
     title: "Rei"
-    color: Theme.canvas
+    color: Theme.obsidian
 
     property int currentPage: 0
+    // Open ReiDialogs (maintained by ReiDialog). While > 0, Esc belongs to the dialog.
+    property int dialogDepth: 0
+    readonly property bool interruptible: backend.state === "processing" || backend.state === "speaking"
 
     readonly property var pages: [
-        { name: "Chat",         icon: "icons/chat.svg",         source: "pages/HomePage.qml" },
-        { name: "Activity",     icon: "icons/activity.svg",     source: "pages/ActivityPage.qml" },
-        { name: "Memory",       icon: "icons/memory.svg",       source: "pages/MemoryPage.qml" },
-        { name: "Capabilities", icon: "icons/capabilities.svg", source: "pages/CapabilitiesPage.qml" },
-        { name: "Connectors",   icon: "icons/connectors.svg",   source: "pages/ConnectorsPage.qml" },
-        { name: "Settings",     icon: "icons/settings.svg",     source: "pages/SettingsPage.qml" }
+        { name: "Chat",         source: "pages/HomePage.qml" },
+        { name: "Activity",     source: "pages/ActivityPage.qml" },
+        { name: "Memory",       source: "pages/MemoryPage.qml" },
+        { name: "Capabilities", source: "pages/CapabilitiesPage.qml" },
+        { name: "Connectors",   source: "pages/ConnectorsPage.qml" },
+        { name: "Settings",     source: "pages/SettingsPage.qml" }
     ]
 
-    // Ctrl+1..5 jumps between pages
+    // Ctrl+1..6 jumps between pages
     Instantiator {
         model: window.pages.length
         delegate: Shortcut {
@@ -33,226 +36,24 @@ ApplicationWindow {
         }
     }
 
-    RowLayout {
+    // Esc stops Rei mid-thought or mid-sentence, unless a dialog is open
+    // (then Esc is the dialog's: cancel / deny).
+    Shortcut {
+        sequence: "Esc"
+        context: Qt.WindowShortcut
+        enabled: window.interruptible && window.dialogDepth === 0 && !backend.needsSetup
+        onActivated: backend.interrupt()
+    }
+
+    ColumnLayout {
         anchors.fill: parent
         spacing: 0
 
-        // SIDEBAR
-        Rectangle {
-            Layout.preferredWidth: Theme.sidebarWidth
-            Layout.fillHeight: true
-            color: Theme.recessed
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.topMargin: 28
-                anchors.bottomMargin: 20
-                anchors.leftMargin: 16
-                anchors.rightMargin: 16
-                spacing: 4
-
-                // Brand: aligned to the same 16px inset as the nav icons
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 16
-                    Layout.bottomMargin: 28
-                    spacing: 12
-                    Rectangle {
-                        Layout.preferredWidth: 18
-                        Layout.preferredHeight: 18
-                        Layout.alignment: Qt.AlignVCenter
-                        radius: 9
-                        color: "transparent"
-                        border.color: Theme.coral
-                        border.width: 2
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: 6; height: 6; radius: 3
-                            color: Theme.coral
-                            opacity: backend.state === "listening" || backend.state === "speaking" ? 1 : 0.35
-                            Behavior on opacity { NumberAnimation { duration: Theme.page } }
-                        }
-                    }
-                    Text {
-                        Layout.alignment: Qt.AlignVCenter
-                        text: "Rei"
-                        color: Theme.textPrimary
-                        font.family: Theme.fontDisplay
-                        font.pixelSize: 20
-                        font.weight: Font.DemiBold
-                        font.letterSpacing: Theme.tracking(20)
-                    }
-                }
-
-                Repeater {
-                    model: window.pages
-                    NavItem {
-                        text: modelData.name
-                        iconSource: Qt.resolvedUrl(modelData.icon)
-                        active: window.currentPage === index
-                        shortcutHint: "Ctrl " + (index + 1)
-                        onClicked: window.currentPage = index
-                    }
-                }
-
-                Item { Layout.fillHeight: true }
-
-                // Now playing (music inside Rei, or Spotify)
-                Rectangle {
-                    id: nowPlayingCard
-                    Layout.fillWidth: true
-                    Layout.bottomMargin: 8
-                    implicitHeight: 60
-                    radius: Theme.radiusControl + 4
-                    color: Theme.elevated
-                    visible: opacity > 0.001
-                    opacity: backend.nowPlaying !== "" ? 1 : 0
-                    Behavior on opacity { NumberAnimation { duration: Theme.page } }
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 14
-                        anchors.rightMargin: 8
-                        spacing: 10
-
-                        Rectangle {
-                            Layout.preferredWidth: 30
-                            Layout.preferredHeight: 30
-                            Layout.alignment: Qt.AlignVCenter
-                            radius: 15
-                            color: Theme.coralAlpha(0.16)
-                            Icon {
-                                anchors.centerIn: parent
-                                source: Qt.resolvedUrl("icons/music.svg")
-                                size: 14
-                                color: Theme.coral
-                            }
-                            // Gentle pulse while playing
-                            SequentialAnimation on scale {
-                                running: backend.nowPlaying !== "" && !backend.nowPlayingPaused
-                                loops: Animation.Infinite
-                                NumberAnimation { to: 1.08; duration: 600; easing.type: Easing.InOutSine }
-                                NumberAnimation { to: 1.0; duration: 600; easing.type: Easing.InOutSine }
-                            }
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.alignment: Qt.AlignVCenter
-                            spacing: 1
-                            Text {
-                                Layout.fillWidth: true
-                                text: backend.nowPlaying
-                                color: Theme.textPrimary
-                                font.family: Theme.fontText
-                                font.pixelSize: 12
-                                font.weight: Font.DemiBold
-                                elide: Text.ElideRight
-                            }
-                            Text {
-                                Layout.fillWidth: true
-                                text: (backend.nowPlayingSource === "spotify" ? "Spotify" : "YouTube")
-                                      + (backend.nowPlayingPaused ? " · Paused" : "")
-                                color: Theme.textMuted
-                                font.family: Theme.fontText
-                                font.pixelSize: 11
-                            }
-                        }
-
-                        Repeater {
-                            model: [
-                                { cmd: "toggle", icon: backend.nowPlayingPaused ? "icons/play.svg" : "icons/pause.svg" },
-                                { cmd: "stop", icon: "icons/stop.svg" }
-                            ]
-                            Rectangle {
-                                required property var modelData
-                                Layout.preferredWidth: 28
-                                Layout.preferredHeight: 28
-                                Layout.alignment: Qt.AlignVCenter
-                                radius: 14
-                                color: ctl.containsMouse ? Theme.elevatedHover : "transparent"
-                                Behavior on color { ColorAnimation { duration: Theme.fast } }
-                                Icon {
-                                    anchors.centerIn: parent
-                                    source: Qt.resolvedUrl(modelData.icon)
-                                    size: 12
-                                    color: ctl.containsMouse ? Theme.textPrimary : Theme.textBody
-                                }
-                                MouseArea {
-                                    id: ctl
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: backend.sendPlayerCommand(modelData.cmd)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Privacy mode switch, pinned to the bottom of the rail
-                Rectangle {
-                    id: privacyChip
-                    Layout.fillWidth: true
-                    implicitHeight: 56
-                    radius: Theme.radiusControl + 4
-                    color: privacyMouse.containsMouse ? Theme.elevated : Qt.rgba(38 / 255, 37 / 255, 59 / 255, 0.5)
-                    Behavior on color { ColorAnimation { duration: Theme.fast } }
-                    readonly property string mode: backend.privacyModeText || "Local Only"
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 16
-                        anchors.rightMargin: 16
-                        spacing: 12
-                        Icon {
-                            Layout.alignment: Qt.AlignVCenter
-                            source: Qt.resolvedUrl(privacyChip.mode === "Cloud Assisted" ? "icons/cloud.svg"
-                                                 : privacyChip.mode === "Local + Connectors" ? "icons/connectors.svg"
-                                                 : "icons/local.svg")
-                            size: 18
-                            color: Theme.textBody
-                        }
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.alignment: Qt.AlignVCenter
-                            spacing: 1
-                            Text {
-                                text: backend.privacyModeText || "Local Only"
-                                color: Theme.textPrimary
-                                font.family: Theme.fontText
-                                font.pixelSize: 13
-                                font.weight: Font.DemiBold
-                            }
-                            Text {
-                                text: privacyChip.mode === "Cloud Assisted" ? "Private data is anonymised"
-                                    : privacyChip.mode === "Local + Connectors" ? "Approved services only"
-                                    : "Nothing leaves this device"
-                                color: Theme.textMuted
-                                font.family: Theme.fontText
-                                font.pixelSize: 11
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                            }
-                        }
-                    }
-                    MouseArea {
-                        id: privacyMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: backend.togglePrivacyMode()
-                    }
-                }
-            }
-
-            // Hairline edge between rail and canvas
-            Rectangle {
-                anchors.right: parent.right
-                width: 1
-                height: parent.height
-                color: Theme.hairline
-            }
+        TopBar {
+            Layout.fillWidth: true
+            pages: window.pages
+            currentPage: window.currentPage
+            onPageSelected: (index) => window.currentPage = index
         }
 
         // PAGES: all pages stay alive (chat history, scroll positions survive),
@@ -292,11 +93,11 @@ ApplicationWindow {
         }
     }
 
-    // ONBOARDING / SETUP OVERLAY
+    // ONBOARDING: a black stage with the orb as the object on display
     Rectangle {
         id: setupOverlay
         anchors.fill: parent
-        color: Theme.canvas
+        color: Theme.obsidian
         z: 100
         opacity: backend.needsSetup ? 1 : 0
         visible: opacity > 0.001
@@ -312,8 +113,8 @@ ApplicationWindow {
 
         ColumnLayout {
             anchors.centerIn: parent
-            width: Math.min(480, parent.width - 80)
-            spacing: 40
+            width: Math.min(520, parent.width - 80)
+            spacing: Theme.s32
 
             VoiceOrb {
                 Layout.alignment: Qt.AlignHCenter
@@ -323,38 +124,31 @@ ApplicationWindow {
 
             ColumnLayout {
                 Layout.fillWidth: true
-                spacing: 4
-                Text {
+                spacing: 0
+                ReiText {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
+                    role: "display"
                     text: "Hello, I'm Rei."
-                    color: Theme.textPrimary
-                    font.family: Theme.fontDisplay
-                    font.pixelSize: 52
-                    font.weight: Font.DemiBold
-                    font.letterSpacing: Theme.tracking(52)
                 }
-                Text {
+                ReiText {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
+                    role: "display"
                     text: "Let's get acquainted."
-                    color: Theme.coral
-                    font.family: Theme.fontDisplay
-                    font.pixelSize: 52
-                    font.weight: Font.DemiBold
-                    font.letterSpacing: Theme.tracking(52)
+                    color: Theme.ash
                 }
             }
 
             ColumnLayout {
                 Layout.fillWidth: true
-                spacing: 20
+                spacing: Theme.s20
                 InputField {
                     id: nameField
                     label: "What should I call you?"
                     placeholder: "Your name"
                     onAccepted: purposeField.input.forceActiveFocus()
-                    Component.onCompleted: input.forceActiveFocus()
+                    Component.onCompleted: if (backend.needsSetup) input.forceActiveFocus()
                 }
                 InputField {
                     id: purposeField
@@ -374,143 +168,109 @@ ApplicationWindow {
         }
     }
 
-    // CONFIRMATION DIALOG
-    Popup {
+    // CONFIRMATION (voice or click). Esc answers "no".
+    ReiDialog {
         id: confirmDialog
-        anchors.centerIn: parent
-        width: Math.min(480, window.width - 80)
-        padding: 28
-        modal: true
-        focus: true
-        closePolicy: Popup.NoAutoClose
+        title: "Confirmation required"
+        escClosable: false
 
         property string intentId: ""
-        function answer(approved) {
-            backend.sendConfirmationResponse(intentId, approved)
-            close()
-        }
-
-        Overlay.modal: Rectangle {
-            color: Qt.rgba(8 / 255, 8 / 255, 14 / 255, 0.6)
-            Behavior on opacity { NumberAnimation { duration: Theme.page } }
-        }
-
-        enter: Transition {
-            ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.page; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "scale"; from: 0.96; to: 1; duration: Theme.page; easing.type: Easing.OutCubic }
-            }
-        }
-        exit: Transition {
-            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.exit; easing.type: Easing.OutCubic }
-        }
-
-        background: Rectangle {
-            color: Theme.elevated
-            radius: Theme.radiusCard
-            border.color: Theme.hairline
-        }
-
-        contentItem: ColumnLayout {
-            spacing: 16
-
-            Text {
-                id: confirmTitle
-                Layout.fillWidth: true
-                text: "Confirmation required"
-                color: Theme.textPrimary
-                font.family: Theme.fontDisplay
-                font.pixelSize: Theme.sizeHeadingSm
-                font.weight: Font.DemiBold
-                font.letterSpacing: Theme.tracking(Theme.sizeHeadingSm)
-                wrapMode: Text.WordWrap
-            }
-
-            Text {
-                id: confirmMsg
-                Layout.fillWidth: true
-                text: ""
-                color: Theme.textBody
-                font.family: Theme.fontText
-                font.pixelSize: Theme.sizeBodySm
-                lineHeight: 1.4
-                wrapMode: Text.Wrap
-            }
-
-            // Voice answer hint: pulsing mic + what to say
-            RowLayout {
-                Layout.fillWidth: true
-                visible: confirmDialog.hint !== ""
-                spacing: 10
-                Rectangle {
-                    Layout.preferredWidth: 28
-                    Layout.preferredHeight: 28
-                    Layout.alignment: Qt.AlignVCenter
-                    radius: 14
-                    color: Theme.coralAlpha(0.16)
-                    Icon {
-                        anchors.centerIn: parent
-                        source: Qt.resolvedUrl("icons/mic.svg")
-                        size: 14
-                        color: Theme.coral
-                    }
-                    SequentialAnimation on opacity {
-                        running: confirmDialog.opened && confirmDialog.hint !== ""
-                        loops: Animation.Infinite
-                        NumberAnimation { to: 0.45; duration: 650; easing.type: Easing.InOutSine }
-                        NumberAnimation { to: 1.0; duration: 650; easing.type: Easing.InOutSine }
-                    }
-                }
-                Text {
-                    Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignVCenter
-                    text: confirmDialog.hint
-                    color: Theme.textPrimary
-                    font.family: Theme.fontText
-                    font.pixelSize: Theme.sizeBodySm
-                    font.weight: Font.DemiBold
-                    wrapMode: Text.WordWrap
-                }
-            }
-
-            // Time left to answer
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 3
-                radius: 1.5
-                color: Qt.rgba(1, 1, 1, 0.06)
-                visible: confirmDialog.seconds > 0
-                Rectangle {
-                    height: parent.height
-                    radius: 1.5
-                    color: confirmDialog.strict ? Theme.coral : Theme.textSecondary
-                    width: parent.width * confirmDialog.remaining
-                }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.topMargin: 8
-                spacing: 8
-                Item { Layout.fillWidth: true }
-                PillButton { text: "Deny"; variant: "ghost"; onClicked: confirmDialog.answer(false) }
-                PillButton { text: confirmDialog.strict ? "Confirm" : "Allow"; variant: "primary"; onClicked: confirmDialog.answer(true) }
-            }
-        }
-
+        property string message: ""
         property string hint: ""
         property int seconds: 0
         property bool strict: false
         property real remaining: 1.0
         NumberAnimation on remaining { id: countdownAnim; running: false; from: 1.0; to: 0.0 }
+
+        function answer(approved) {
+            backend.sendConfirmationResponse(intentId, approved)
+            close()
+        }
         onClosed: { countdownAnim.stop(); hint = ""; seconds = 0 }
+
+        ReiText {
+            Layout.fillWidth: true
+            role: "reading"
+            text: confirmDialog.message
+            color: Theme.porcelain
+            wrapMode: Text.Wrap
+        }
+
+        // Voice answer hint: pulsing mic + what to say
+        RowLayout {
+            Layout.fillWidth: true
+            visible: confirmDialog.hint !== ""
+            spacing: Theme.s10
+            Rectangle {
+                Layout.preferredWidth: 28
+                Layout.preferredHeight: 28
+                Layout.alignment: Qt.AlignVCenter
+                radius: 14
+                color: Theme.capsule
+                Icon {
+                    anchors.centerIn: parent
+                    source: Qt.resolvedUrl("icons/mic.svg")
+                    size: 14
+                    color: Theme.porcelain
+                }
+                SequentialAnimation on opacity {
+                    running: confirmDialog.opened && confirmDialog.hint !== ""
+                    loops: Animation.Infinite
+                    NumberAnimation { to: 0.45; duration: 650; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 1.0; duration: 650; easing.type: Easing.InOutSine }
+                }
+            }
+            ReiText {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignVCenter
+                role: "bodyStrong"
+                text: confirmDialog.hint
+                wrapMode: Text.WordWrap
+            }
+        }
+
+        // Time left to answer
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 3
+            radius: 1.5
+            color: Theme.steel
+            visible: confirmDialog.seconds > 0
+            Rectangle {
+                height: parent.height
+                radius: 1.5
+                color: confirmDialog.strict ? Theme.alert : Theme.porcelain
+                width: parent.width * confirmDialog.remaining
+            }
+        }
+
+        buttons: [
+            PillButton { text: "Deny"; variant: "outline"; onClicked: confirmDialog.answer(false) },
+            PillButton {
+                text: confirmDialog.strict ? "Confirm" : "Allow"
+                variant: "primary"
+                onClicked: confirmDialog.answer(true)
+            }
+        ]
+    }
+
+    Shortcut {
+        sequence: "Esc"
+        enabled: confirmDialog.opened
+        onActivated: confirmDialog.answer(false)
+    }
+
+    // PRIVACY MODE (opened from the utility bar, Settings or Connectors)
+    PrivacyModeDialog {
+        id: modeDialog
+        objectName: "privacyModeDialog"
     }
 
     Connections {
         target: backend
         function onConfirmationRequested(title, msg, intent_id) {
-            confirmTitle.text = title
-            confirmMsg.text = msg
+            confirmDialog.title = title
+            confirmDialog.message = msg
             confirmDialog.intentId = intent_id
             confirmDialog.hint = ""
             confirmDialog.seconds = 0
@@ -526,6 +286,9 @@ ApplicationWindow {
         function onConfirmationClosed(intent_id) {
             // Answered by voice or timed out: close without sending a response
             if (confirmDialog.opened && confirmDialog.intentId === intent_id) confirmDialog.close()
+        }
+        function onPrivacyModeChangeRequested(mode) {
+            modeDialog.openFor(mode)
         }
     }
 }

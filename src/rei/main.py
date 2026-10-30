@@ -4,7 +4,7 @@ import os
 import secrets
 import time
 from pathlib import Path
-from typing import Any, Awaitable
+from typing import Any
 
 from PySide6.QtWidgets import QApplication
 from qasync import QEventLoop # type: ignore
@@ -94,10 +94,10 @@ async def start_voice_loop(ui: 'ReiUI', aec: EchoCanceller, route_input: Any, bu
         ui.set_status(f"Voice Error: {e}")
         return
 
-    def on_utterance(text: str) -> None:
+    def on_utterance(text: str, during_playback: bool) -> None:
         # Non-blocking: the mic keeps listening while the turn runs, so a
-        # spoken "yes" can answer a confirmation mid-turn
-        route_input(text, Origin.USER_VOICE)
+        # spoken "yes" can answer a confirmation and "stop" can interrupt
+        route_input(text, Origin.USER_VOICE, during_playback=during_playback)
 
     # Only touch the UI state when no turn owns it (a turn may be speaking/listening)
     loop = VoiceLoop(
@@ -253,14 +253,48 @@ def main() -> None:
     def busy() -> bool:
         return active_turns["n"] > 0 or confirmer.pending
 
-    from rei.voice.wake import strip_wake_word
+    from rei.voice.wake import strip_wake_word, gate_voice
 
-    def route_input(text: str, origin: Origin) -> None:
+    # The turn currently holding turn_lock, so it can be interrupted
+    current_turn: dict[str, Any] = {"token": None, "task": None}
+
+    def interrupt() -> None:
+        """Stop button, Esc, orb tap or a spoken "stop": end the running turn
+        (thinking or speaking) and return to the rest state."""
+        token, task = current_turn["token"], current_turn["task"]
+        if token is None or token.is_cancelled:
+            speaker.stop()
+            return
+        token.cancel()
+        speaker.stop()
+        # An open confirmation is answered "no", never left to approve later
+        for intent_id in list(ui_client.pending_confirmations):
+            ui.backend.sendConfirmationResponse(intent_id, False)
+        confirmer.cancel()
+        if task is not None and not task.done():
+            task.cancel()
+        ui.add_message("Stopped.", False)
+
+    ui.backend.interruptRequested.connect(interrupt)
+
+    def route_input(text: str, origin: Origin, during_playback: bool = False) -> None:
         """Every utterance or typed message enters here. While Rei is waiting
         for a confirmation, the input answers it instead of starting a turn."""
         text = text.strip()
         if not text:
             return
+        if origin == Origin.USER_VOICE:
+            verdict = gate_voice(
+                text,
+                rei_talking=during_playback or speaker.is_speaking,
+                turn_active=active_turns["n"] > 0,
+                confirm_pending=confirmer.pending,
+                spoken=speaker.current_text or speaker.last_text,
+            )
+            if verdict == "interrupt":
+                interrupt()
+            if verdict != "route":
+                return
         if origin == Origin.USER_VOICE and player.active and not player.paused and not confirmer.pending:
             command = strip_wake_word(text)
             if command is None:
@@ -285,9 +319,11 @@ def main() -> None:
             ui.add_message(text, True)
         active_turns["n"] += 1
         player.duck(True)  # music goes quiet while Rei listens/thinks/speaks
-        async with turn_lock:
-            ui.set_state("processing")
-            try:
+        token = CancelToken()
+        try:
+            async with turn_lock:
+                current_turn["token"], current_turn["task"] = token, asyncio.current_task()
+                ui.set_state("processing")
                 ctx = PolicyContext(
                     session_id="voice-session" if origin == Origin.USER_VOICE else "ui-session",
                     turn_id=f"turn-{secrets.token_hex(4)}",
@@ -297,20 +333,25 @@ def main() -> None:
                     settings={},
                     recent=None,
                 )
-                result = await orchestrator.process_turn(text, ctx, CancelToken(), allow_actions=allow_actions)
+                result = await orchestrator.process_turn(text, ctx, token, allow_actions=allow_actions)
+                if token.is_cancelled:
+                    return  # interrupted: "Stopped." is already in the chat
                 update_now_playing()  # e.g. Spotify started playing on another device
                 ui.add_message(result.reply, False)
                 await speaker.say(result.reply, on_start=lambda: ui.set_state("speaking"))
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:
-                print(f"Turn failed: {e}")
-                ui.add_message("Sorry, something went wrong while handling that.", False)
-            finally:
-                active_turns["n"] -= 1
-                if active_turns["n"] == 0:
-                    player.duck(False)
-                ui.set_rest_state()
+        except asyncio.CancelledError:
+            if not token.is_cancelled:
+                raise  # app shutdown, not an interrupt
+        except Exception as e:
+            print(f"Turn failed: {e}")
+            ui.add_message("Sorry, something went wrong while handling that.", False)
+        finally:
+            if current_turn["token"] is token:
+                current_turn["token"] = current_turn["task"] = None
+            active_turns["n"] -= 1
+            if active_turns["n"] == 0:
+                player.duck(False)
+            ui.set_rest_state()
 
     def on_setup(name: str, purpose: str) -> None:
         from rei.capabilities.spec import DataClass
@@ -352,18 +393,14 @@ def main() -> None:
     ui.backend.onboardingCompleted.connect(on_setup)
 
     def set_privacy_mode(name: str) -> None:
-        if name not in MODES:
+        # Only reached after the user confirms in the privacy-mode dialog
+        if name not in MODES or name == ui.backend.privacyModeText:
             return
         ui.backend.privacyModeText = name
         egress_gate.current_mode = MODES[name]
+        if not busy():
+            ui.set_status(f"Switched to {name}")
 
-    def on_privacy_toggle() -> None:
-        # Cycle Local Only -> Local + Connectors -> Cloud Assisted
-        names = list(MODES)
-        current = names.index(ui.backend.privacyModeText) if ui.backend.privacyModeText in names else 0
-        set_privacy_mode(names[(current + 1) % len(names)])
-
-    ui.backend.privacyModeToggled.connect(on_privacy_toggle)
     ui.backend.privacyModeSelected.connect(set_privacy_mode)
 
     def refresh_models() -> None:

@@ -108,3 +108,15 @@ async def test_cancel_token_stops_playback(fake_sd: FakeSD) -> None:
     token.cancel()
     await asyncio.wait_for(task, timeout=1)
     assert fake_sd.stops >= 1
+
+
+@pytest.mark.asyncio
+async def test_current_text_tracks_what_rei_is_saying(fake_sd: FakeSD) -> None:
+    speaker = Speaker(_tts(5.0), EchoCanceller(), echo_tail_s=0.01)
+    task = asyncio.ensure_future(speaker.say("I'll stop the music now."))
+    await asyncio.sleep(0.2)
+    assert speaker.current_text == "I'll stop the music now."
+    speaker.stop()  # barge-in
+    await asyncio.wait_for(task, timeout=2)
+    assert speaker.current_text == ""
+    assert speaker.last_text == "I'll stop the music now."

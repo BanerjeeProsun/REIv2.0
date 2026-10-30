@@ -8,26 +8,21 @@ PageScaffold {
     title: "Settings"
     subtitle: "Control what Rei can see, where it thinks, and how it sounds."
 
-    readonly property var modes: ["Local Only", "Local + Connectors", "Cloud Assisted"]
-    readonly property int modeIndex: Math.max(0, modes.indexOf(backend.privacyModeText))
-    readonly property var descriptions: [
-        "Everything runs on this device. Nothing you say or type leaves your computer.",
-        "Rei still thinks on-device, but services you connect (email, music) can go online.",
-        "Complex requests use the cloud planner. Names, emails and secrets are replaced on-device before anything is sent."
-    ]
+    readonly property int modeIndex: PrivacyModes.indexOf(backend.privacyModeText)
 
     SectionLabel { text: "Privacy" }
 
     SettingRow {
-        title: page.modes[page.modeIndex]
-        description: page.descriptions[page.modeIndex]
-        iconSource: Qt.resolvedUrl(["../icons/local.svg", "../icons/connectors.svg", "../icons/cloud.svg"][page.modeIndex])
+        title: PrivacyModes.names[page.modeIndex]
+        description: PrivacyModes.descriptions[page.modeIndex]
+        iconSource: PrivacyModes.icon(page.modeIndex)
 
+        // Shows the current mode; picking another asks for confirmation first
         SegmentedControl {
-            options: ["Local", "+ Connectors", "Cloud"]
+            options: PrivacyModes.shortNames
             segmentWidth: 104
             currentIndex: page.modeIndex
-            onSelected: (index) => backend.setPrivacyMode(page.modes[index])
+            onSelected: (index) => backend.requestPrivacyMode(PrivacyModes.names[index])
         }
     }
 
@@ -35,14 +30,18 @@ PageScaffold {
 
     SettingRow {
         title: "Speech recognition"
-        description: "Whisper (base), English, running on-device."
+        description: "Whisper (base), English, running on-device. Background noise is filtered out, and you can say “stop” to interrupt Rei."
         iconSource: Qt.resolvedUrl("../icons/mic.svg")
-        Tag { text: backend.state === "idle" ? "Mic off" : "Mic live"; dot: true; dotColor: backend.state === "idle" ? Theme.textMuted : Theme.coral }
+        Tag {
+            text: backend.state === "idle" ? "Mic off" : "Mic live"
+            dot: true
+            dotColor: backend.state === "idle" ? Theme.ash : Theme.porcelain
+        }
     }
 
     SettingRow {
         title: "Voice output"
-        description: "Kokoro neural voice, synthesised locally."
+        description: "Kokoro neural voice, synthesised locally. Press Esc or tap the orb to stop it mid-sentence."
         iconSource: Qt.resolvedUrl("../icons/chat.svg")
         Tag { text: "On-device" }
     }
@@ -53,6 +52,7 @@ PageScaffold {
         title: "LLM backend"
         description: "Dynamic model unloading and hardware acceleration settings."
         iconSource: Qt.resolvedUrl("../icons/capabilities.svg")
-        Tag { text: "Coming soon" }
+        // Release-status marker: text only, never a badge (DESIGN.md)
+        ReiText { role: "caption"; text: "Coming soon"; color: Theme.copperNew }
     }
 }

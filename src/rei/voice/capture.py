@@ -1,10 +1,12 @@
 import asyncio
-import sounddevice as sd # type: ignore
+import sounddevice as sd  # type: ignore
 import numpy as np
 from typing import Any
 
+
 class AudioCaptureError(Exception):
     pass
+
 
 class AudioCapture:
     """Captures raw audio from the microphone into an asyncio queue."""
@@ -13,7 +15,7 @@ class AudioCapture:
         self.sample_rate = sample_rate
         self.channels = channels
         self.chunk_size = chunk_size
-        self.queue: asyncio.Queue[np.ndarray] = asyncio.Queue(maxsize=100) # Bounded queue (CON-01)
+        self.queue: asyncio.Queue[np.ndarray] = asyncio.Queue(maxsize=100)  # Bounded queue (CON-01)
         self.stream: sd.InputStream | None = None
         self.loop = asyncio.get_running_loop()
 
@@ -21,16 +23,16 @@ class AudioCapture:
         self, indata: np.ndarray, frames: int, time_info: dict[str, Any], status: sd.CallbackFlags
     ) -> None:
         if status and status.input_overflow:
-            pass # ignore expected overflow
+            pass  # ignore expected overflow
         elif status:
             print(f"Audio capture warning: {status}")
-            
-        def _safe_put():
+
+        def _safe_put() -> None:
             try:
                 self.queue.put_nowait(indata.copy())
             except asyncio.QueueFull:
                 pass
-                
+
         self.loop.call_soon_threadsafe(_safe_put)
 
     def clear(self) -> None:

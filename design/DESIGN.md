@@ -1,252 +1,203 @@
-# Changelog — Style Reference
-> observatory console behind dark glass.
+# Neuralink — Style Reference
+> obsidian laboratory with a single color synapse — a black void where only light, shadow, and one thin spectrum of color speak
 
-**Theme:** dark
+**Theme:** mixed
 
 Source measurements are normalized; roles and recommendations are interpreted. Font summary lists are independent, not paired by position. HTML examples are reconstructions, not source components.
 
-Linear operates in a deep-space monochrome: a near-black canvas (#08090a) layered with whisper-quiet neutral surfaces, hairline borders at 4–5px radius, and almost no chromatic presence. The entire interface reads as machined precision — Inter Variable at custom weights (400, 500, 510, 590) with negative tracking, and Berkeley Mono reserved for inline code references. Elevation is implied by stacked grays and 1px strokes, never by drop shadows. Buttons are pill-shaped (9999px) outlined in white, never filled with brand color — confidence comes from contrast and restraint, not from accents. The result feels like an engineering control surface: dense, calm, and information-first.
+Neuralink operates as a near-pure monochrome system: a near-black canvas, a white surface, and one off-white band, with no chromatic brand color at all. A single spectrum gradient — pink to violet — appears only as the announcement bar and as photo-card overlays, acting as the system's sole injection of warmth and life. Typography carries almost all of the brand voice: a geometric sans at weight 300 for display sizes with aggressively tight tracking (-0.165em at 48px) that gives headlines a compressed, engineered density. Pill-shaped controls (80px radius) sit against full-bleed black and white blocks, creating a cinematic, almost editorial rhythm where the only color signal is a faint synaptic glow.
 
 ## Tokens — Colors
 
 | Name | Value | Token | Role |
 |------|-------|-------|------|
-| Onyx Canvas | `#08090a` | `--color-onyx-canvas` | Page background, primary surface |
-| Carbon Surface | `#141516` | `--color-carbon-surface` | Elevated card, input field, subtle surface layer |
-| Graphite Surface | `#1c1c1f` | `--color-graphite-surface` | Mid-elevation panels, nested surfaces |
-| Smoke Surface | `#23252a` | `--color-smoke-surface` | Hover state, deeper card, button surface tone |
-| Iron Surface | `#2d2e31` | `--color-iron-surface` | Pressed/active surface, highest tier elevation |
-| Ash Border | `#34343a` | `--color-ash-border` | Primary hairline border — dividers, table rows, list separators |
-| Ferrite Border | `#3e3e44` | `--color-ferrite-border` | Inner shadow stroke, focus-adjacent borders, subtle 1px outlines |
-| Steel Text | `#62666d` | `--color-steel-text` | Tertiary text, icon muted state, low-emphasis helper text |
-| Pewter Text | `#7f7f80` | `--color-pewter-text` | Disabled text, placeholder-tier secondary content |
-| Fog Text | `#8a8f98` | `--color-fog-text` | Muted body text, metadata, timestamps, nav sub-items |
-| Mist Text | `#d0d6e0` | `--color-mist-text` | Secondary text, descriptions, list body, paragraph fallback |
-| Chalk Border | `#e4e5e9` | `--color-chalk-border` | Light icon accent, rare light-tone dividers |
-| Snow | `#f7f8f8` | `--color-snow` | Primary text, headings, logo, pill button border — the only near-white |
-| Void | `#030404` | `--color-void` | Deepest recess, box-shadow tint, absolute dark accent |
+| Obsidian | `#000000` | `--color-obsidian` | Page hero canvas, primary text, section dividers, dark-mode blocks. The dominant structural color — used 931 times as backgrounds, borders, and text. Creates a void-like base that makes white type and the single gradient feel electric by contrast |
+| Paper | `#ffffff` | `--color-paper` | Content section background, card surfaces, ghost-button text and border. The light counterpart to Obsidian — every content section sits on Paper, and outlined/ghost buttons invert to Paper stroke on Obsidian backgrounds |
+| Ash | `#f5f5f5` | `--color-ash` | Soft off-white surface for the footer and secondary bands. Separates Paper from true white when a gentler contrast is needed — used for the meet-our-pioneers section background and the footer |
+| Fog | `#bababa` | `--color-fog` | Muted nav text and low-emphasis dividers. A desaturated mid-gray for inactive navigation labels and subtle hairline borders where black would feel too heavy |
+| Synapse Gradient | `linear-gradient(90deg, #e486ab, #7f80b3 20%, #435a93 50%, #6452d8 95%)` | `--color-synapse-gradient` | The only chromatic element in the entire system. A four-stop spectrum (warm rose → cool lavender → indigo → violet) used exclusively for the announcement bar and photo-card overlays. The dominant anchor color is the violet end (#6452d8), giving the gradient a cool, neurological character |
 
 ## Tokens — Typography
 
-### Inter Variable — Primary typeface across all UI. Weight 590 is the signature display weight — the half-step past 500/600 gives Linear a tighter, more controlled visual rhythm than typical 600-bold headlines. Used for body, nav, headings, buttons, icons, links, and footer. · `--font-inter-variable`
-- **Substitute:** Inter (from Google Fonts) or system-ui
-- **Weights:** 400, 500, 510, 590
-- **Sizes:** 12px, 13px, 14px, 15px, 16px, 17px, 24px, 32px, 48px
-- **Line height:** 1.13–2.86
-- **Letter spacing:** -0.010em to -0.022em, scaling with size
-- **OpenType features:** `"cv01", "ss03"; "cv01", "ss01", "ss03"`
-- **Role:** Primary typeface across all UI. Weight 590 is the signature display weight — the half-step past 500/600 gives Linear a tighter, more controlled visual rhythm than typical 600-bold headlines. Used for body, nav, headings, buttons, icons, links, and footer.
-
-### Berkeley Mono — Monospace accent for inline code references, command examples, and technical callouts (e.g., 'Granolio - create issues from my last meeting'). Its presence signals developer-grade precision without screaming for attention. · `--font-berkeley-mono`
-- **Substitute:** JetBrains Mono or IBM Plex Mono
-- **Weights:** 400, 590
-- **Sizes:** 15px, 21px
-- **Line height:** 1.30
-- **Letter spacing:** -0.014em
-- **Role:** Monospace accent for inline code references, command examples, and technical callouts (e.g., 'Granolio - create issues from my last meeting'). Its presence signals developer-grade precision without screaming for attention.
+### UntitledSans — The sole typeface — a custom geometric sans used at all sizes and weights. Weight 300 at display sizes is anti-convention: most bold-tech brands use 600-700 for headlines, but Neuralink's whisper-light displays with aggressive negative tracking create authority through restraint and engineered density, not volume. Weight 400 for body, 500 for nav, 700 reserved for emphasis. · `--font-untitledsans`
+- **Substitute:** Inter, Söhne, or General Sans
+- **Weights:** 300, 400, 500, 700
+- **Sizes:** 8px, 12px, 14px, 16px, 17px, 18px, 24px, 32px, 44px, 48px
+- **Line height:** 1.00, 1.15, 1.20, 1.50
+- **Letter spacing:** -0.165em at 48px display, -0.060em at 32px, -0.050em at 24px, -0.037em at 18px, -0.030em at 17px, -0.020em at 16px, -0.015em at 14px
+- **Role:** The sole typeface — a custom geometric sans used at all sizes and weights. Weight 300 at display sizes is anti-convention: most bold-tech brands use 600-700 for headlines, but Neuralink's whisper-light displays with aggressive negative tracking create authority through restraint and engineered density, not volume. Weight 400 for body, 500 for nav, 700 reserved for emphasis.
 
 ### Type Scale
 
 | Role | Family | Weight | Size | Line Height | Letter Spacing | Token |
 |------|--------|--------|------|-------------|----------------|-------|
-| caption | — | — | 12px | 1.6 | -0.12px | `--text-caption` |
-| body | — | — | 15px | 1.5 | -0.15px | `--text-body` |
-| heading-sm | — | — | 24px | 1.33 | -0.288px | `--text-heading-sm` |
-| heading | — | — | 32px | 1.2 | -0.416px | `--text-heading` |
-| display | — | — | 48px | 1.13 | -1.056px | `--text-display` |
+| caption | — | — | 12px | 1.5 | -0.18px | `--text-caption` |
+| body-sm | — | — | 14px | 1.5 | -0.21px | `--text-body-sm` |
+| body | — | — | 16px | 1.5 | -0.32px | `--text-body` |
+| body-lg | — | — | 18px | 1.5 | -0.67px | `--text-body-lg` |
+| subheading | — | — | 24px | 1.2 | -1.2px | `--text-subheading` |
+| heading-sm | — | — | 32px | 1.15 | -1.92px | `--text-heading-sm` |
+| heading | — | — | 44px | 1.15 | -2.64px | `--text-heading` |
+| display | — | — | 48px | 1 | -7.92px | `--text-display` |
 
 ## Tokens — Spacing & Shapes
 
-**Base unit:** 4px
-
-**Density:** compact
+**Density:** comfortable
 
 ### Spacing Scale
 
 | Name | Value | Token |
 |------|-------|-------|
 | 4 | 4px | `--spacing-4` |
+| 5 | 5px | `--spacing-5` |
+| 6 | 6px | `--spacing-6` |
 | 8 | 8px | `--spacing-8` |
 | 12 | 12px | `--spacing-12` |
 | 16 | 16px | `--spacing-16` |
+| 18 | 18px | `--spacing-18` |
 | 20 | 20px | `--spacing-20` |
 | 24 | 24px | `--spacing-24` |
+| 30 | 30px | `--spacing-30` |
 | 32 | 32px | `--spacing-32` |
-| 48 | 48px | `--spacing-48` |
-| 56 | 56px | `--spacing-56` |
-| 80 | 80px | `--spacing-80` |
+| 40 | 40px | `--spacing-40` |
+| 46 | 46px | `--spacing-46` |
+| 50 | 50px | `--spacing-50` |
+| 60 | 60px | `--spacing-60` |
+| 240 | 240px | `--spacing-240` |
 
 ### Border Radius
 
 | Element | Value |
 |---------|-------|
-| nav | 9999px |
-| tags | 4px |
-| cards | 8px |
-| icons | 4.4625px |
-| inputs | 4px |
-| buttons | 9999px |
-
-### Shadows
-
-| Name | Value | Token |
-|------|-------|-------|
-| subtle | `rgb(62, 62, 68) 0px 0px 0px 1px` | `--shadow-subtle` |
-| subtle-2 | `rgba(0, 0, 0, 0.01) 0px 5px 2px 0px, rgba(0, 0, 0, 0.04) ...` | `--shadow-subtle-2` |
-| subtle-3 | `rgba(255, 255, 255, 0.03) 0px 0px 0px 1px inset, rgba(255...` | `--shadow-subtle-3` |
+| cards | 20px |
+| buttons | 80px |
+| nav-buttons | 16px |
+| body-elements | 60px |
 
 ### Layout
 
-- **Page max-width:** 1080px
-- **Section gap:** 48px
-- **Card padding:** 16px
-- **Element gap:** 8px
+- **Page max-width:** 1200px
+- **Section gap:** 80px
+- **Card padding:** 32px
+- **Element gap:** 12px
 
 ## Components
 
-### Top Navigation Bar
-**Role:** Persistent site navigation
+### Synapse Announcement Bar
+**Role:** Full-width gradient strip at the very top of every page
 
-Sticky header, full-bleed, background #08090a with 1px bottom border #23252a. Height ~56px. Logo (Linear mark + wordmark in #f7f8f8) left-aligned, nav links (Product, Resources, Customers, Pricing, Now, Contact) in #8a8f98 weight 510, right-aligned controls with vertical separator and ghost Login + outlined Sign Up pill.
+Full-bleed gradient bar (Synapse Gradient: rose → lavender → indigo → violet, 90deg). White text at 12px, weight 400, centered. Close button (×) on the far right. Height ~32px, no padding beyond vertical centering. This is the ONLY place the gradient appears as a solid bar.
 
-### Outlined Pill Button
-**Role:** Primary and secondary actions
+### Minimal Navigation Header
+**Role:** Primary site navigation on all pages
 
-9999px radius. Border 1px solid #f7f8f8, background transparent, text #f7f8f8 at 14px weight 510, padding 8px 16px. No fill state, no shadow — confidence comes from the white outline against near-black. Used for 'Sign up' and key conversion actions.
+Sits on a #000000 (Obsidian) or #ffffff (Paper) background depending on the section. Logo (stylized N-wave mark) left-aligned. Nav links (Technology, Careers, Updates) right-aligned at 16px, weight 400, in Paper or Obsidian text. A pill-shaped 'Clinical Trials' button with 16px radius sits at the far right — 1px border matching the text color, transparent fill, 6px vertical / 12px horizontal padding.
 
-### Ghost Text Button
-**Role:** Tertiary actions and nav links
+### Full-Bleed Hero Block
+**Role:** Primary page-opening visual zone
 
-No border, no background. Text at 14px weight 510, color #8a8f98. Hover state transitions text color to #f7f8f8. 8px horizontal padding. Used for 'Log in', top-nav links, and inline link buttons.
+Full-viewport-width Obsidian (#000000) background extending edge-to-edge with no max-width constraint. Display text at 48px, weight 300, in #ffffff, positioned in the lower-left quadrant with generous left and bottom padding (~80-120px). A single ghost pill button sits below the headline. No imagery, no decoration — pure black void with white type.
 
-### Search Input
-**Role:** Global search/changelog filter
+### Ghost Pill Button
+**Role:** Outlined/ghost action button used on dark backgrounds
 
-Dark surface #141516 with 1px border #23252a, radius 4px. Height ~32px, padding 8px 12px. Placeholder text 'Search...' in #8a8f98. Magnifying glass icon left-aligned in #8a8f98. No focus ring — just border color shift to #34343a.
+Transparent background, 1px solid #ffffff border, border-radius 80px (full pill). Text at 16px, weight 400, #ffffff, with a 2px right arrow icon. Padding 12px vertical, 24px horizontal. No fill on hover — the button reads as a subtle outline, not a heavy action element.
 
-### Section Tab Nav
-**Role:** In-page sub-navigation (Changelog tabs)
+### Filled Pill Button
+**Role:** Primary action button used on light backgrounds
 
-Horizontal row below page title. Active tab ('Changelog') in #f7f8f8 weight 510, inactive tabs in #8a8f98. Tabs separated by 16px gap, no underline indicator. Sits at 14px, left-aligned.
+Solid #ffffff background on Obsidian sections, or solid #000000 on Paper sections. Border-radius 80px. Text at 16px, weight 500, contrasting color, with right arrow. Padding 12px vertical, 24px horizontal. Used sparingly — only one button appears in the hero.
 
-### Date Marker
-**Role:** Changelog entry date label
+### Two-Column Content Section
+**Role:** Text-heavy explanatory content blocks on white background
 
-Small inline label with a 6px dot (chromatic accent, subtle orange/red #e4e5e9 or warm gray) and date text 'April 23, 2026' at 13px weight 400 in #8a8f98. Left-aligned to the entry, marks temporal grouping on the changelog timeline.
+#ffffff background, max-width ~1200px centered. Left column holds a large heading (44-48px, weight 300) with tight tracking. Right column holds two paragraphs of body text (16-18px, weight 400, #000000) stacked vertically with ~30px row gap. Generous vertical padding (80px top/bottom). No images, no cards — pure typographic layout.
 
-### Changelog Entry Heading
-**Role:** Release/feature title
+### Pioneer Card
+**Role:** Large photo-overlay card for featured audience segments
 
-24px–32px Inter Variable weight 510, color #f7f8f8, letter-spacing -0.012em to -0.013em. Anchored to the left content column. Optional hash-anchor link icon (#8a8f98) appears on hover, positioned right of the text.
+Aspect ratio roughly 3:4, border-radius 20px. Full-bleed photograph inside, overlaid with a gradient wash (teal/green on left card, pink/magenta on right card — used to differentiate card identity without adding UI color). White overlay text (heading at 24px weight 500, subtext at 16px weight 400) positioned in the lower-left. A ghost pill button (1px white border, 80px radius) sits below the text. Used in pairs side-by-side.
 
-### App Connector Icon Grid
-**Role:** Visual showcase of integrations
+### Centered Section Heading
+**Role:** Section-introducing title text
 
-3-row grid of rounded squares (border-radius 8px, ~64px size), dark surface #1c1c1f with 1px border #23252a. Each tile holds a brand glyph in #f7f8f8. Subtle 1px inner stroke. Grids centered or left-aligned within content column, used to illustrate MCP connector ecosystem.
+Centered alignment, 32-44px, weight 300, #000000. Sits on either Paper or Ash background with ~80px vertical padding above and below. No supporting subtitle — the heading stands alone, creating breathing room before the content below.
 
-### Inline Product Reference List
-**Role:** Bulleted changelog body content
+### Footer
+**Role:** Page-bottom information area
 
-Unordered list with 6–8px row gap, 4px left padding. Bullet character default #62666d. Body text at 15px weight 400, color #d0d6e0. Inline product names (e.g., 'Granolio', 'Glean', 'Notion', 'PostHog') bolded to weight 590 in #f7f8f8 — no underlines, no links, just typographic weight shift.
-
-### Command Reference Card
-**Role:** Inline code/comment example block
-
-Dark surface #1c1c1f with 1px border #23252a, radius 4px. Padding 12px 16px. Contains a small source label ('Granolio - create issues from my last meeting') in Berkeley Mono 15px, color #f7f8f8. Optional icon cluster on right (status dots, action buttons) in #8a8f98. Mimics a code comment or terminal snippet.
-
-### Sub-section Divider Heading
-**Role:** Sub-feature grouping
-
-20–24px Inter Variable weight 510, color #f7f8f8, with 16px top margin. Followed by a single-sentence preamble at 15px weight 400 in #d0d6e0. Used to break long changelog entries into scannable sub-sections.
-
-### Body Paragraph
-**Role:** Default prose content
-
-15–16px Inter Variable weight 400, line-height 1.5–1.6, color #d0d6e0. Max-width constrained to ~640px within content column. Links inline at weight 510 color #f7f8f8 with no underline (underline appears on hover).
-
-### Hash Anchor Link
-**Role:** Deep-link to section
-
-Small '#' icon at 16px, color #8a8f98, appears 12px to the right of headings on hover. Subtle, functional, not decorative.
+Ash (#f5f5f5) background, full-width. Minimal content — likely links and copyright in small text (12-14px, weight 400, #000000). Generous padding (60-80px vertical). No color, no imagery — maintains the system's monochrome discipline to the bottom of the page.
 
 ## Do's and Don'ts
 
 ### Do
-- Use 9999px radius for all action buttons, nav items, and tag pills — pill-shaped controls are the signature geometry.
-- Set primary text and borders to #f7f8f8 against #08090a canvas — the near-white-on-near-black contrast is the entire brand.
-- Use Inter Variable at weight 510 for headings and 590 for emphasis — avoid 600/700 bold, the half-step weights are the signature.
-- Apply negative letter-spacing across all sizes: -0.010em for body, scaling to -0.022em at display 48px.
-- Layer surfaces with the gray stack: #08090a → #141516 → #1c1c1f → #23252a → #2d2e31. Each level is exactly one step lighter.
-- Use 1px hairline borders in #23252a or #34343a for all dividers, card edges, and input frames — never use drop shadows for separation.
-- Reserve Berkeley Mono for inline code references and command examples only — it should appear sparingly as a technical accent.
+- Use #000000 as the full-bleed hero background with #ffffff display text at 48px weight 300, letter-spacing -7.92px
+- Apply the Synapse Gradient only in the announcement bar and as photo-card overlay washes — never as a solid UI surface, button fill, or text color
+- Set border-radius to 80px on all action buttons for full pill geometry; use 20px on cards and 60px on large container elements
+- Maintain aggressive negative letter-spacing: -0.165em at 48px down to -0.015em at 14px, never let large type run at default tracking
+- Separate content sections with Ash (#f5f5f5) bands between Paper (#ffffff) blocks to create rhythm without adding color
+- Use weight 300 for all display and heading sizes (32px+); reserve weight 700 only for inline emphasis within body text
+- Keep page max-width at 1200px for content sections; let hero and announcement bar go full-bleed edge-to-edge
 
 ### Don't
-- Do not introduce chromatic brand colors, accent fills, or gradient CTAs — the 3% colorfulness is a discipline, not a limitation.
-- Do not use 600/700 font weights for headings — Linear's typographic voice is weight 510/590, not bold.
-- Do not apply drop shadows to cards or panels — use surface-level gray shifts instead. The only shadow is the 1px stroke pattern.
-- Do not use filled buttons with solid backgrounds for primary actions — outlined pill buttons (1px #f7f8f8 border) are the only action style.
-- Do not break the compact 4px base spacing rhythm with large gaps — section gaps stay at 48px, element gaps at 6–8px.
-- Do not use rounded corners larger than 8px on cards or images — 4–5px and 8px are the only card radii; 9999px is pill-only.
-- Do not use 600/700 bold for inline emphasis in body text — use weight 590 or rely on color shift to #f7f8f8 for highlight.
+- Do not introduce any chromatic brand color — the system is monochrome by design, and the gradient is the only exception
+- Do not use drop shadows, box-elevation, or blur effects on any component — depth comes from surface contrast only
+- Do not use square or slightly-rounded corners (4px, 8px) on buttons — the 80px pill radius is a signature element
+- Do not use weight 600 or 700 for headlines — the weight 300 display is a deliberate anti-convention choice
+- Do not add letter-spacing to small text or use positive tracking anywhere — the entire scale runs negative or zero
+- Do not use the gradient as a background for text blocks or data tables — it is reserved for the announcement bar and photo overlays
+- Do not place multiple ghost buttons adjacent to each other on the same surface — one outlined action per zone, with filled buttons as the alternative
 
 ## Surfaces
 
 | Level | Name | Value | Purpose |
 |-------|------|-------|---------|
-| 0 | Onyx Canvas | `#08090a` | Page background, full-bleed base |
-| 1 | Carbon | `#141516` | Input fields, inline code cards |
-| 2 | Graphite | `#1c1c1f` | Nested panels, icon tiles, code snippets |
-| 3 | Smoke | `#23252a` | Borders, hover surfaces, button borders |
-| 4 | Iron | `#2d2e31` | Pressed/active state, highest elevation |
+| 1 | Obsidian Canvas | `#000000` | Full-bleed hero sections, dark mode blocks, dramatic contrast zones |
+| 2 | Paper Surface | `#ffffff` | Primary content background, text-heavy sections, card surfaces |
+| 3 | Ash Band | `#f5f5f5` | Soft separator sections (meet-our-pioneers), footer, breathing room between Paper blocks |
 
 ## Elevation
 
-Linear deliberately avoids drop shadows. Separation is achieved through three techniques: (1) stacked gray surfaces (5 levels of near-black), (2) 1px hairline borders in #23252a–#34343a, and (3) the rare inner-stroke pattern (rgba(255,255,255,0.03) inset) on elevated buttons. This creates a flat, machined feel where depth is read by value contrast, not blur or offset.
+Neuralink deliberately avoids shadows and box-elevation. The depth system is built entirely from surface color contrast: Obsidian blocks sit adjacent to Paper blocks, and Ash bands separate Paper sections. The only depth signal is the border on the gradient photo cards and the hairline button borders — no drop shadows, no blurred glows. This flat, shadowless approach reinforces the engineered, clinical aesthetic.
 
 ## Imagery
 
-Visual language is UI-dominant with minimal decorative imagery. The page features inline product screenshots and app connector icon grids — small rounded squares (8px radius) showing brand glyphs in white on dark surfaces. Product illustrations are contained, not full-bleed, and sit within the content column at modest sizes. The only gradient is a subtle horizontal shimmer (#e4e5e9 → #9c9da1) likely used on the logo or a brand mark. No lifestyle photography, no abstract atmospheric renders — the interface itself is the visual.
+Photography appears only inside Pioneer Cards, treated as full-bleed backgrounds with gradient color washes (teal-green on one card, pink-magenta on the other) that temper the photo into the brand palette. The photos are portrait-oriented, showing people in soft natural-light environments — never clinical, never staged in a lab. No product photography, no 3D renders, no illustrations appear elsewhere. The hero and all content sections are purely typographic — no images, no icons beyond a small arrow glyph inside buttons. The visual system communicates through surface contrast and one gradient, not through visual content density.
 
 ## Layout
 
-Full-bleed dark canvas with a max-width content column (~640–720px) centered for prose, expanding to ~1080px for wider sections. The page is single-column changelog: a sticky top nav, then a large section title ('Now') with inline tab nav, followed by dated entries stacked vertically with generous 48px section gaps. Each entry uses a left-aligned date marker and right-flowing content. No multi-column grids in the main flow — the icon grid is the only matrix layout, centered as a contained block. Navigation is minimal: a single top bar with logo, 6 text links, and a outlined pill CTA. No sidebar, no mega-menu, no footer in viewport.
+The page follows a full-bleed → contained → full-bleed rhythm. The hero is edge-to-edge Obsidian with no max-width constraint and text anchored in the lower-left. Content sections are centered within ~1200px max-width on Paper or Ash backgrounds. The layout alternates: Obsidian hero → Paper two-column content → Ash centered-heading + two-card grid → Ash footer. Navigation is a single thin bar that persists across all sections, adapting its text/border color to the underlying surface. Vertical spacing is generous (80px section gaps) with comfortable 12-30px element gaps. No sidebar, no mega-menu, no sticky elements beyond the nav bar itself.
 
 ## Agent Prompt Guide
 
-
-
 **Quick Color Reference**
-- Text primary: #f7f8f8
-- Text secondary: #d0d6e0
-- Text muted: #8a8f98
-- Background: #08090a
-- Border: #23252a
+- text: #000000
+- background (content): #ffffff
+- background (hero/footer-dark): #000000
+- background (soft band): #f5f5f5
+- border (nav/inactive): #bababa
+- accent (gradient only): #6452d8 (violet anchor) with rose→lavender→indigo→violet spectrum
 - primary action: no distinct CTA color
 
-**Example Component Prompts**
+**3-5 Example Component Prompts**
 
-1. *Changelog entry heading*: 32px Inter Variable weight 510, color #f7f8f8, letter-spacing -0.416px, left-aligned with 48px top margin. Hash anchor icon in #8a8f98 appears on hover.
+1. *Create a full-bleed hero section*: #000000 background, edge-to-edge with no max-width. Display text at 48px, UntitledSans weight 300, #ffffff, letter-spacing -7.92px, line-height 1.0, positioned lower-left with ~80px left padding and ~120px bottom padding. A ghost pill button below: transparent fill, 1px #ffffff border, 80px border-radius, 12px 24px padding, 16px weight 400 #ffffff text with right arrow.
 
-2. *Outlined pill button*: 9999px radius, 1px solid #f7f8f8 border, transparent background, 14px Inter Variable weight 510 in #f7f8f8, padding 8px 16px. No fill, no shadow.
+2. *Create a two-column content section*: #ffffff background, max-width 1200px centered, 80px vertical padding. Left column: heading at 44px, UntitledSans weight 300, #000000, letter-spacing -2.64px. Right column: two paragraphs of body text at 16px, weight 400, #000000, stacked with 30px row gap.
 
-3. *App connector icon tile*: 64×64px, border-radius 8px, background #1c1c1f, 1px border #23252a, centered white brand glyph at 32px. Arranged in 3-row grid with 16px gap.
+3. *Create a Pioneer Card*: 3:4 aspect ratio, border-radius 20px, full-bleed photo background. Overlay a teal-to-green gradient wash at ~40% opacity on the lower half. White heading at 24px weight 500 in the lower-left with 32px padding. Below it, a ghost pill button: transparent fill, 1px #ffffff border, 80px radius, 16px weight 400 #ffffff text with arrow.
 
-4. *Date marker*: 6px filled dot in warm accent color followed by 'April 23, 2026' at 13px weight 400 in #8a8f98, left-aligned to content column.
+4. *Create the announcement bar*: full-bleed strip, height ~32px, background is the Synapse Gradient (linear-gradient 90deg, #e486ab, #7f80b3 20%, #435a93 50%, #6452d8 95%). White text at 12px, weight 400, centered. A white × close button on the far right.
 
-5. *Inline product reference list*: Bulleted list with 8px row gap, 15px Inter Variable weight 400 in #d0d6e0, inline product names bolded to weight 590 in #f7f8f8 (no underline).
-
-
-
-## Typographic Voice
-
-Linear's typography is its loudest signal. The use of Inter Variable with custom half-step weights (510 for headings, 590 for emphasis) avoids the generic 400/600/700 triad that dominates SaaS. The result: headings feel precise rather than bold, emphasis feels intentional rather than heavy. Negative letter-spacing tightens the rhythm at every size — -0.010em for body, -0.022em for display 48px. Font features 'cv01' (curved alternates) and 'ss03' (stylistic set 3) further differentiate the typeface from stock Inter. Berkeley Mono appears only in code-adjacent contexts, acting as a technical whisper rather than a stylistic flourish.
+5. *Create a minimal navigation bar*: transparent or #000000 background, logo on far left, nav links (Technology, Careers, Updates) at 16px weight 400 right-aligned with 20px gap between links, and a pill button 'Clinical Trials' at 16px border-radius, 1px #ffffff border, 6px 12px padding, 16px weight 400 #ffffff text at the far right.
 
 ## Similar Brands
 
-- **Vercel** — Same near-black canvas, monochrome palette, pill-shaped outlined CTAs, and hairline-border surface treatment with no drop shadows.
-- **Raycast** — Dark-mode product UI with 9999px pill buttons, compact density, and Inter-based typography with custom weight steps.
-- **Cursor** — Developer-tool aesthetic with stacked gray surfaces, minimal chromatic accent, and typographic discipline over decorative imagery.
-- **Notion** — Restrained dark UI with subtle surface elevation via gray shifts, though Notion uses more whitespace and less density.
+- **Apple** — Same full-bleed black hero with massive light-weight display type and near-zero color palette — both rely on surface contrast and generous whitespace rather than chromatic branding
+- **Stripe** — Both use tight-tracked geometric sans-serifs at display sizes with pill-shaped buttons and gradient accent strips, though Stripe introduces more color in its gradients
+- **Linear** — Shared commitment to monochrome interface (0% colorfulness) with information density carried by typography and spacing rather than color coding
+- **Nothing (Nothing.tech)** — Similar monochrome-first product aesthetic with dot-matrix typography and a single accent — both use restraint as the design statement
+- **Humane (AI Pin)** — Both position as futuristic tech brands using near-pure black/white palettes with cinematic full-bleed heroes and pill-shaped ghost buttons
 
 ## Quick Start
 
@@ -255,92 +206,88 @@ Linear's typography is its loudest signal. The use of Inter Variable with custom
 ```css
 :root {
   /* Colors */
-  --color-onyx-canvas: #08090a;
-  --color-carbon-surface: #141516;
-  --color-graphite-surface: #1c1c1f;
-  --color-smoke-surface: #23252a;
-  --color-iron-surface: #2d2e31;
-  --color-ash-border: #34343a;
-  --color-ferrite-border: #3e3e44;
-  --color-steel-text: #62666d;
-  --color-pewter-text: #7f7f80;
-  --color-fog-text: #8a8f98;
-  --color-mist-text: #d0d6e0;
-  --color-chalk-border: #e4e5e9;
-  --color-snow: #f7f8f8;
-  --color-void: #030404;
+  --color-obsidian: #000000;
+  --color-paper: #ffffff;
+  --color-ash: #f5f5f5;
+  --color-fog: #bababa;
+  --color-synapse-gradient: #6452d8;
+  --gradient-synapse-gradient: linear-gradient(90deg, #e486ab, #7f80b3 20%, #435a93 50%, #6452d8 95%);
 
   /* Typography — Font Families */
-  --font-inter-variable: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-berkeley-mono: 'Berkeley Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-untitledsans: 'UntitledSans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   /* Typography — Scale */
   --text-caption: 12px;
-  --leading-caption: 1.6;
-  --tracking-caption: -0.12px;
-  --text-body: 15px;
+  --leading-caption: 1.5;
+  --tracking-caption: -0.18px;
+  --text-body-sm: 14px;
+  --leading-body-sm: 1.5;
+  --tracking-body-sm: -0.21px;
+  --text-body: 16px;
   --leading-body: 1.5;
-  --tracking-body: -0.15px;
-  --text-heading-sm: 24px;
-  --leading-heading-sm: 1.33;
-  --tracking-heading-sm: -0.288px;
-  --text-heading: 32px;
-  --leading-heading: 1.2;
-  --tracking-heading: -0.416px;
+  --tracking-body: -0.32px;
+  --text-body-lg: 18px;
+  --leading-body-lg: 1.5;
+  --tracking-body-lg: -0.67px;
+  --text-subheading: 24px;
+  --leading-subheading: 1.2;
+  --tracking-subheading: -1.2px;
+  --text-heading-sm: 32px;
+  --leading-heading-sm: 1.15;
+  --tracking-heading-sm: -1.92px;
+  --text-heading: 44px;
+  --leading-heading: 1.15;
+  --tracking-heading: -2.64px;
   --text-display: 48px;
-  --leading-display: 1.13;
-  --tracking-display: -1.056px;
+  --leading-display: 1;
+  --tracking-display: -7.92px;
 
   /* Typography — Weights */
+  --font-weight-light: 300;
   --font-weight-regular: 400;
   --font-weight-medium: 500;
-  --font-weight-w510: 510;
-  --font-weight-w590: 590;
+  --font-weight-bold: 700;
 
   /* Spacing */
-  --spacing-unit: 4px;
   --spacing-4: 4px;
+  --spacing-5: 5px;
+  --spacing-6: 6px;
   --spacing-8: 8px;
   --spacing-12: 12px;
   --spacing-16: 16px;
+  --spacing-18: 18px;
   --spacing-20: 20px;
   --spacing-24: 24px;
+  --spacing-30: 30px;
   --spacing-32: 32px;
-  --spacing-48: 48px;
-  --spacing-56: 56px;
-  --spacing-80: 80px;
+  --spacing-40: 40px;
+  --spacing-46: 46px;
+  --spacing-50: 50px;
+  --spacing-60: 60px;
+  --spacing-240: 240px;
 
   /* Layout */
-  --page-max-width: 1080px;
-  --section-gap: 48px;
-  --card-padding: 16px;
-  --element-gap: 8px;
+  --page-max-width: 1200px;
+  --section-gap: 80px;
+  --card-padding: 32px;
+  --element-gap: 12px;
 
   /* Border Radius */
-  --radius-md: 4.4625px;
-  --radius-lg: 8px;
-  --radius-full: 100px;
-  --radius-full-2: 9999px;
+  --radius-2xl: 16px;
+  --radius-2xl-2: 20px;
+  --radius-full: 60px;
+  --radius-full-2: 80px;
 
   /* Named Radii */
-  --radius-nav: 9999px;
-  --radius-tags: 4px;
-  --radius-cards: 8px;
-  --radius-icons: 4.4625px;
-  --radius-inputs: 4px;
-  --radius-buttons: 9999px;
-
-  /* Shadows */
-  --shadow-subtle: rgb(62, 62, 68) 0px 0px 0px 1px;
-  --shadow-subtle-2: rgba(0, 0, 0, 0.01) 0px 5px 2px 0px, rgba(0, 0, 0, 0.04) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
-  --shadow-subtle-3: rgba(255, 255, 255, 0.03) 0px 0px 0px 1px inset, rgba(255, 255, 255, 0.04) 0px 1px 0px 0px inset, rgba(0, 0, 0, 0.6) 0px 0px 0px 1px, rgba(0, 0, 0, 0.1) 0px 4px 4px 0px;
+  --radius-cards: 20px;
+  --radius-buttons: 80px;
+  --radius-nav-buttons: 16px;
+  --radius-body-elements: 60px;
 
   /* Surfaces */
-  --surface-onyx-canvas: #08090a;
-  --surface-carbon: #141516;
-  --surface-graphite: #1c1c1f;
-  --surface-smoke: #23252a;
-  --surface-iron: #2d2e31;
+  --surface-obsidian-canvas: #000000;
+  --surface-paper-surface: #ffffff;
+  --surface-ash-band: #f5f5f5;
 }
 ```
 
@@ -349,63 +296,63 @@ Linear's typography is its loudest signal. The use of Inter Variable with custom
 ```css
 @theme {
   /* Colors */
-  --color-onyx-canvas: #08090a;
-  --color-carbon-surface: #141516;
-  --color-graphite-surface: #1c1c1f;
-  --color-smoke-surface: #23252a;
-  --color-iron-surface: #2d2e31;
-  --color-ash-border: #34343a;
-  --color-ferrite-border: #3e3e44;
-  --color-steel-text: #62666d;
-  --color-pewter-text: #7f7f80;
-  --color-fog-text: #8a8f98;
-  --color-mist-text: #d0d6e0;
-  --color-chalk-border: #e4e5e9;
-  --color-snow: #f7f8f8;
-  --color-void: #030404;
+  --color-obsidian: #000000;
+  --color-paper: #ffffff;
+  --color-ash: #f5f5f5;
+  --color-fog: #bababa;
+  --color-synapse-gradient: #6452d8;
 
   /* Typography */
-  --font-inter-variable: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-berkeley-mono: 'Berkeley Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-untitledsans: 'UntitledSans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   /* Typography — Scale */
   --text-caption: 12px;
-  --leading-caption: 1.6;
-  --tracking-caption: -0.12px;
-  --text-body: 15px;
+  --leading-caption: 1.5;
+  --tracking-caption: -0.18px;
+  --text-body-sm: 14px;
+  --leading-body-sm: 1.5;
+  --tracking-body-sm: -0.21px;
+  --text-body: 16px;
   --leading-body: 1.5;
-  --tracking-body: -0.15px;
-  --text-heading-sm: 24px;
-  --leading-heading-sm: 1.33;
-  --tracking-heading-sm: -0.288px;
-  --text-heading: 32px;
-  --leading-heading: 1.2;
-  --tracking-heading: -0.416px;
+  --tracking-body: -0.32px;
+  --text-body-lg: 18px;
+  --leading-body-lg: 1.5;
+  --tracking-body-lg: -0.67px;
+  --text-subheading: 24px;
+  --leading-subheading: 1.2;
+  --tracking-subheading: -1.2px;
+  --text-heading-sm: 32px;
+  --leading-heading-sm: 1.15;
+  --tracking-heading-sm: -1.92px;
+  --text-heading: 44px;
+  --leading-heading: 1.15;
+  --tracking-heading: -2.64px;
   --text-display: 48px;
-  --leading-display: 1.13;
-  --tracking-display: -1.056px;
+  --leading-display: 1;
+  --tracking-display: -7.92px;
 
   /* Spacing */
   --spacing-4: 4px;
+  --spacing-5: 5px;
+  --spacing-6: 6px;
   --spacing-8: 8px;
   --spacing-12: 12px;
   --spacing-16: 16px;
+  --spacing-18: 18px;
   --spacing-20: 20px;
   --spacing-24: 24px;
+  --spacing-30: 30px;
   --spacing-32: 32px;
-  --spacing-48: 48px;
-  --spacing-56: 56px;
-  --spacing-80: 80px;
+  --spacing-40: 40px;
+  --spacing-46: 46px;
+  --spacing-50: 50px;
+  --spacing-60: 60px;
+  --spacing-240: 240px;
 
   /* Border Radius */
-  --radius-md: 4.4625px;
-  --radius-lg: 8px;
-  --radius-full: 100px;
-  --radius-full-2: 9999px;
-
-  /* Shadows */
-  --shadow-subtle: rgb(62, 62, 68) 0px 0px 0px 1px;
-  --shadow-subtle-2: rgba(0, 0, 0, 0.01) 0px 5px 2px 0px, rgba(0, 0, 0, 0.04) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
-  --shadow-subtle-3: rgba(255, 255, 255, 0.03) 0px 0px 0px 1px inset, rgba(255, 255, 255, 0.04) 0px 1px 0px 0px inset, rgba(0, 0, 0, 0.6) 0px 0px 0px 1px, rgba(0, 0, 0, 0.1) 0px 4px 4px 0px;
+  --radius-2xl: 16px;
+  --radius-2xl-2: 20px;
+  --radius-full: 60px;
+  --radius-full-2: 80px;
 }
 ```

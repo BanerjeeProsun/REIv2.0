@@ -30,6 +30,10 @@ class Speaker:
         self.echo_tail_s = echo_tail_s
         self._lock = asyncio.Lock()
         self._current: CancelToken | None = None
+        # What Rei is saying right now (and said last), so the mic can tell
+        # its own echo apart from the user
+        self.current_text = ""
+        self.last_text = ""
 
     @property
     def is_speaking(self) -> bool:
@@ -54,6 +58,7 @@ class Speaker:
             if token.is_cancelled:
                 return
             self._current = token
+            self.current_text = text
             self.aec.mark_playback_active(True)
             try:
                 if on_start:
@@ -71,3 +76,4 @@ class Speaker:
                     await asyncio.sleep(self.echo_tail_s)
                 finally:
                     self.aec.mark_playback_active(False)
+                    self.last_text, self.current_text = text, ""

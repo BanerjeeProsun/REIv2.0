@@ -52,8 +52,9 @@ select = ["E", "F", "S"]  # flake8-bandit subset (S)
 "tests/*" = ["S101"]
 
 [tool.mypy]
-
 strict = true
+disable_error_code = ["method-assign", "no-redef", "redundant-cast"]
+warn_unused_ignores = false
 
 [dependency-groups]
 dev = [

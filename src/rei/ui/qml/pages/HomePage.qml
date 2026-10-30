@@ -8,6 +8,7 @@ Item {
     id: root
 
     readonly property bool hasMessages: chatModel.count > 0
+    readonly property bool interruptible: backend.state === "processing" || backend.state === "speaking"
     readonly property string greeting: {
         var h = new Date().getHours()
         var part = h < 5 ? "Good evening" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"
@@ -31,47 +32,39 @@ Item {
 
     ColumnLayout {
         id: column
-        width: Math.min(parent.width - 2 * Theme.pageMarginX, Theme.pageMaxWidth)
+        width: Math.min(parent.width - 2 * Theme.pageMarginX, Theme.chatMaxWidth)
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        anchors.topMargin: 28
-        anchors.bottomMargin: 28
+        anchors.topMargin: Theme.s24
+        anchors.bottomMargin: Theme.s24
         spacing: 0
 
-        // COMPACT ORB + STATUS (once a conversation has started).
-        // The block itself is centred: a nested layout is only as wide as its
-        // children, so centring the children inside it would do nothing.
+        // COMPACT ORB + STATUS (once a conversation has started)
         ColumnLayout {
             Layout.alignment: Qt.AlignHCenter
             visible: root.hasMessages
-            spacing: 10
+            spacing: Theme.s10
 
             VoiceOrb {
                 Layout.alignment: Qt.AlignHCenter
-                size: 88
+                size: 72
+                onTapped: backend.interrupt()
             }
-
-            Tag {
-                Layout.alignment: Qt.AlignHCenter
-                text: backend.status
-                ink: Theme.textBody
-                dot: true
-                dotColor: backend.state === "idle" ? Theme.textMuted : Theme.coral
-            }
+            StatusCapsule { Layout.alignment: Qt.AlignHCenter }
         }
 
         // CONVERSATION
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.topMargin: root.hasMessages ? 16 : 0
+            Layout.topMargin: root.hasMessages ? Theme.s16 : 0
 
-            // Empty state: large orb anchoring an editorial two-tone headline
+            // Empty state: the orb on its stage above a two-tone headline
             ColumnLayout {
                 anchors.centerIn: parent
                 width: parent.width
-                spacing: 2
+                spacing: 0
                 opacity: root.hasMessages ? 0 : 1
                 visible: opacity > 0.001
                 Behavior on opacity { NumberAnimation { duration: Theme.page; easing.type: Easing.OutCubic } }
@@ -79,46 +72,36 @@ Item {
                 VoiceOrb {
                     Layout.alignment: Qt.AlignHCenter
                     size: 150
+                    onTapped: backend.interrupt()
                 }
-                Tag {
+                StatusCapsule {
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 4
-                    Layout.bottomMargin: 28
-                    text: backend.status
-                    ink: Theme.textBody
-                    dot: true
-                    dotColor: backend.state === "idle" ? Theme.textMuted : Theme.coral
+                    Layout.topMargin: Theme.s4
+                    Layout.bottomMargin: Theme.s32
                 }
 
-                Text {
+                ReiText {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
+                    role: "display"
                     text: root.greeting
-                    color: Theme.textPrimary
-                    font.family: Theme.fontDisplay
-                    font.pixelSize: 48
-                    font.weight: Font.DemiBold
-                    font.letterSpacing: Theme.tracking(48)
                     wrapMode: Text.WordWrap
                 }
-                Text {
+                ReiText {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
+                    role: "display"
                     text: "What's on your mind?"
-                    color: Theme.coral
-                    font.family: Theme.fontDisplay
-                    font.pixelSize: 48
-                    font.weight: Font.DemiBold
-                    font.letterSpacing: Theme.tracking(48)
+                    color: Theme.ash
+                    wrapMode: Text.WordWrap
                 }
-                Text {
+                ReiText {
                     Layout.fillWidth: true
-                    Layout.topMargin: 16
+                    Layout.topMargin: Theme.s20
                     horizontalAlignment: Text.AlignHCenter
+                    role: "reading"
                     text: "Speak naturally or type below."
-                    color: Theme.textSecondary
-                    font.family: Theme.fontText
-                    font.pixelSize: Theme.sizeBody
+                    color: Theme.ash
                 }
             }
 
@@ -126,10 +109,10 @@ Item {
                 id: chatList
                 anchors.fill: parent
                 model: chatModel
-                spacing: 18
+                spacing: Theme.s20
                 clip: true
-                topMargin: 8
-                bottomMargin: 16
+                topMargin: Theme.s8
+                bottomMargin: Theme.s16
                 boundsBehavior: Flickable.StopAtBounds
                 ScrollBar.vertical: ThinScrollBar {}
 
@@ -150,55 +133,49 @@ Item {
                         NumberAnimation { target: shift; property: "y"; to: 0; duration: 180; easing.type: Easing.OutCubic }
                     }
 
-                    // User: right-aligned plum bubble
+                    // User: right-aligned Carbon bubble
                     Rectangle {
                         id: bubble
                         visible: msg.isUser
                         anchors.right: parent.right
-                        width: Math.min(userText.implicitWidth + 36, msg.width * 0.72)
-                        height: userText.implicitHeight + 24
-                        radius: Theme.radiusCard
-                        color: Theme.elevated
-                        Text {
+                        width: Math.min(userText.implicitWidth + 2 * Theme.s20, msg.width * 0.72)
+                        height: userText.implicitHeight + 2 * Theme.s12
+                        radius: Theme.radiusNav
+                        color: Theme.carbon
+                        ReiText {
                             id: userText
                             anchors.fill: parent
-                            anchors.leftMargin: 18
-                            anchors.rightMargin: 18
+                            anchors.leftMargin: Theme.s20
+                            anchors.rightMargin: Theme.s20
                             verticalAlignment: Text.AlignVCenter
+                            role: "reading"
                             text: msg.msgText
-                            color: Theme.textPrimary
-                            font.family: Theme.fontText
-                            font.pixelSize: Theme.sizeBody
-                            lineHeight: 1.35
                             wrapMode: Text.Wrap
                         }
                     }
 
-                    // Rei: left-aligned text with a small ember glyph on the first line
+                    // Rei: left-aligned reading text beside a small lit ring
                     RowLayout {
                         id: reiRow
                         visible: !msg.isUser
                         width: msg.width * 0.86
-                        spacing: 14
+                        spacing: Theme.s14
                         Rectangle {
                             Layout.alignment: Qt.AlignTop
-                            Layout.topMargin: 4
-                            Layout.preferredWidth: 14
-                            Layout.preferredHeight: 14
-                            radius: 7
+                            Layout.topMargin: 6
+                            Layout.preferredWidth: 12
+                            Layout.preferredHeight: 12
+                            radius: 6
                             color: "transparent"
-                            border.color: Theme.coral
-                            border.width: 2
+                            border.color: Theme.porcelain
+                            border.width: 1.5
                         }
-                        Text {
+                        ReiText {
                             Layout.fillWidth: true
+                            role: "reading"
                             text: msg.msgText
-                            color: Theme.textBody
-                            font.family: Theme.fontText
-                            font.pixelSize: Theme.sizeBody
-                            lineHeight: 1.4
+                            color: Theme.porcelain
                             wrapMode: Text.Wrap
-                            textFormat: Text.PlainText
                         }
                     }
                 }
@@ -206,109 +183,146 @@ Item {
             }
         }
 
-        // PROMPT BAR (AI Prompt Input: pill, coral dot, mic/send on the right)
+        // PROMPT BAR (Device Selector input: faint fill, Slate keyline, round)
         Rectangle {
             id: prompt
             Layout.fillWidth: true
-            Layout.topMargin: 12
-            implicitHeight: 60
-            radius: Theme.radiusPill
-            color: chatInput.activeFocus ? Theme.elevatedHover : promptHover.hovered ? Qt.darker(Theme.elevatedHover, 1.06) : Theme.elevated
+            Layout.topMargin: Theme.s12
+            implicitHeight: 56
+            radius: height / 2
+            color: promptHover.hovered && !chatInput.activeFocus ? Theme.fieldFillHover : Theme.fieldFill
             border.width: 1
-            border.color: chatInput.activeFocus ? Theme.coralAlpha(0.55) : Theme.hairline
+            border.color: chatInput.activeFocus || promptHover.hovered ? Theme.ash : Theme.slate
             Behavior on color { ColorAnimation { duration: Theme.fast } }
             Behavior on border.color { ColorAnimation { duration: Theme.fast } }
 
             HoverHandler { id: promptHover; cursorShape: Qt.IBeamCursor }
             TapHandler { onTapped: chatInput.forceActiveFocus() }
+            FocusRing { shown: chatInput.activeFocus; baseRadius: prompt.radius }
 
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 24
-                anchors.rightMargin: 10
-                spacing: 14
+                anchors.leftMargin: Theme.s24
+                anchors.rightMargin: Theme.s10
+                spacing: Theme.s12
 
-                // AI indicator: pulses while the mic is live
+                // Live indicator: breathes while the mic is listening
                 Rectangle {
-                    Layout.preferredWidth: 8
-                    Layout.preferredHeight: 8
+                    Layout.preferredWidth: 6
+                    Layout.preferredHeight: 6
                     Layout.alignment: Qt.AlignVCenter
-                    radius: 4
-                    color: Theme.coral
+                    radius: 3
+                    color: backend.state === "idle" ? Theme.ash : Theme.porcelain
                     SequentialAnimation on opacity {
                         running: backend.state === "listening"
                         loops: Animation.Infinite
-                        NumberAnimation { to: 0.35; duration: 700; easing.type: Easing.InOutSine }
-                        NumberAnimation { to: 1.0; duration: 700; easing.type: Easing.InOutSine }
+                        NumberAnimation { to: 0.3; duration: 800; easing.type: Easing.InOutSine }
+                        NumberAnimation { to: 1.0; duration: 800; easing.type: Easing.InOutSine }
                     }
                 }
 
                 TextInput {
                     id: chatInput
+                    objectName: "chatInput"
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignVCenter
                     verticalAlignment: TextInput.AlignVCenter
-                    color: Theme.textPrimary
-                    selectionColor: Theme.coralAlpha(0.45)
-                    selectedTextColor: Theme.textPrimary
+                    color: Theme.porcelain
+                    selectionColor: Theme.alpha(Theme.appleBlue, 0.55)
+                    selectedTextColor: Theme.white
                     font.family: Theme.fontText
-                    font.pixelSize: Theme.sizeBody
+                    font.pixelSize: Theme.type.reading.size
+                    font.letterSpacing: Theme.type.reading.tracking
                     clip: true
                     focus: true
+                    activeFocusOnTab: true
                     onAccepted: root.send()
 
-                    Text {
+                    ReiText {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: backend.state === "listening" ? "Listening… or type a message" : "Message Rei"
-                        color: Theme.textMuted
+                        width: parent.width
+                        elide: Text.ElideRight
+                        role: "reading"
+                        color: Theme.ash
                         visible: chatInput.text.length === 0
-                        font: chatInput.font
+                        text: backend.state === "speaking" ? "Speaking. Press Esc or say “stop”"
+                            : backend.state === "processing" ? "Thinking. Press Esc to stop"
+                            : backend.state === "listening" ? "Listening… or type a message"
+                            : "Message Rei"
                     }
                 }
 
-                // Mic state when empty, coral send button when there's text
+                // Esc keycap, shown while there is something to stop
+                Rectangle {
+                    Layout.alignment: Qt.AlignVCenter
+                    Layout.preferredWidth: escLabel.implicitWidth + 2 * Theme.s6
+                    Layout.preferredHeight: 20
+                    radius: Theme.radiusKey
+                    color: "transparent"
+                    border.width: 1
+                    border.color: Theme.steel
+                    visible: opacity > 0.001
+                    opacity: root.interruptible ? 1 : 0
+                    Behavior on opacity { NumberAnimation { duration: Theme.fast } }
+                    ReiText {
+                        id: escLabel
+                        anchors.centerIn: parent
+                        role: "utilityNav"
+                        text: "Esc"
+                        color: Theme.ash
+                    }
+                }
+
+                // One slot, three faces: mic (idle) / send (text) / stop (busy)
                 Item {
                     id: actionSlot
-                    Layout.preferredWidth: 40
-                    Layout.preferredHeight: 40
+                    Layout.preferredWidth: 36
+                    Layout.preferredHeight: 36
                     Layout.alignment: Qt.AlignVCenter
                     readonly property bool canSend: chatInput.text.trim().length > 0
+                    readonly property string face: canSend ? "send" : root.interruptible ? "stop" : "mic"
 
                     Icon {
                         anchors.centerIn: parent
                         source: "../icons/mic.svg"
                         size: 18
-                        color: backend.state === "listening" ? Theme.textBody : Theme.textMuted
-                        opacity: actionSlot.canSend ? 0 : 1
-                        scale: actionSlot.canSend ? 0.6 : 1
+                        color: backend.state === "listening" ? Theme.porcelain : Theme.ash
+                        opacity: actionSlot.face === "mic" ? 1 : 0
+                        scale: actionSlot.face === "mic" ? 1 : 0.6
                         Behavior on opacity { NumberAnimation { duration: Theme.fast } }
                         Behavior on scale { NumberAnimation { duration: Theme.fast; easing.type: Easing.OutCubic } }
                     }
 
-                    Rectangle {
+                    IconButton {
+                        id: sendButton
                         anchors.fill: parent
-                        radius: 20
-                        color: sendMouse.pressed ? Theme.coralPressed : sendMouse.containsMouse ? Theme.coralHover : Theme.coral
-                        opacity: actionSlot.canSend ? 1 : 0
-                        scale: !actionSlot.canSend ? 0.6 : sendMouse.pressed ? 0.92 : 1
+                        variant: "primary"
+                        iconSource: Qt.resolvedUrl("../icons/send.svg")
+                        iconSize: 16
+                        iconOffsetX: -1
+                        tooltip: "Send"
+                        enabled: actionSlot.face === "send"
                         visible: opacity > 0.001
+                        opacity: actionSlot.face === "send" ? 1 : 0
+                        scale: actionSlot.face === "send" ? (pressed ? 0.96 : 1) : 0.6
                         Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-                        Behavior on scale { NumberAnimation { duration: Theme.fast; easing.type: Easing.OutCubic } }
-                        Behavior on color { ColorAnimation { duration: Theme.fast } }
-                        Icon {
-                            anchors.centerIn: parent
-                            anchors.horizontalCenterOffset: -1
-                            source: "../icons/send.svg"
-                            size: 16
-                            color: Theme.textPrimary
-                        }
-                        MouseArea {
-                            id: sendMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.send()
-                        }
+                        onClicked: root.send()
+                    }
+
+                    IconButton {
+                        id: stopButton
+                        objectName: "stopButton"
+                        anchors.fill: parent
+                        variant: "capsule"
+                        iconSource: Qt.resolvedUrl("../icons/stop.svg")
+                        iconSize: 14
+                        tooltip: "Stop"
+                        enabled: actionSlot.face === "stop"
+                        visible: opacity > 0.001
+                        opacity: actionSlot.face === "stop" ? 1 : 0
+                        scale: actionSlot.face === "stop" ? (pressed ? 0.96 : 1) : 0.6
+                        Behavior on opacity { NumberAnimation { duration: Theme.fast } }
+                        onClicked: backend.interrupt()
                     }
                 }
             }

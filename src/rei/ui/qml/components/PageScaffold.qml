@@ -3,9 +3,9 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import ".."
 
-// Shared page frame. Title, subtitle and content live in ONE centred column,
-// so every header and the content under it start on the same left axis, and
-// the column resizes with the window (never wider than Theme.pageMaxWidth).
+// Shared page frame on the black stage. Title, subtitle and content live in
+// ONE centred column, so every header and the content under it start on the
+// same left axis, and the column resizes with the window.
 Item {
     id: root
     property string title: ""
@@ -17,7 +17,7 @@ Item {
         id: scroller
         anchors.fill: parent
         contentWidth: availableWidth
-        contentHeight: column.implicitHeight + Theme.pageMarginTop + Theme.s40
+        contentHeight: column.implicitHeight + Theme.pageMarginTop + Theme.s48
         clip: true
         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
         ScrollBar.vertical: ThinScrollBar {
@@ -43,23 +43,18 @@ Item {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignBottom
                     spacing: Theme.s8
-                    Text {
+                    ReiText {
                         Layout.fillWidth: true
+                        role: "headline"
                         text: root.title
-                        color: Theme.textPrimary
-                        font.family: Theme.fontDisplay
-                        font.pixelSize: Theme.sizeHeadingLg
-                        font.weight: Font.DemiBold
-                        font.letterSpacing: Theme.tracking(Theme.sizeHeadingLg)
                         elide: Text.ElideRight
                     }
-                    Text {
+                    ReiText {
                         visible: root.subtitle !== ""
                         Layout.fillWidth: true
+                        role: "reading"
                         text: root.subtitle
-                        color: Theme.textSecondary
-                        font.family: Theme.fontText
-                        font.pixelSize: Theme.sizeBody
+                        color: Theme.ash
                         wrapMode: Text.WordWrap
                     }
                 }
@@ -75,7 +70,7 @@ Item {
             ColumnLayout {
                 id: body
                 Layout.fillWidth: true
-                spacing: Theme.s16
+                spacing: Theme.s12
             }
         }
     }
