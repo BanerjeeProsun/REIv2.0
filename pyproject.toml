@@ -53,7 +53,7 @@ select = ["E", "F", "S"]  # flake8-bandit subset (S)
 
 [tool.mypy]
 strict = true
-disable_error_code = ["method-assign", "no-redef"]
+disable_error_code = ["method-assign", "no-redef", "redundant-cast"]
 warn_unused_ignores = false
 
 [dependency-groups]

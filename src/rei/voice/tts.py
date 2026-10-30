@@ -3,7 +3,7 @@ import math
 import numpy as np
 import sounddevice as sd # type: ignore
 from pathlib import Path
-from typing import Callable
+from typing import Callable, cast
 from rei.core.cancellation import CancelToken
 
 LevelCallback = Callable[[float], None]
@@ -29,7 +29,7 @@ def amplitude_envelope(audio: np.ndarray, sample_rate: int, frame_s: float = FRA
     peak = float(rms.max()) if rms.size else 0.0
     if peak <= 1e-6:
         return np.zeros(n_frames, dtype=np.float32)
-    return np.clip(rms / peak, 0.0, 1.0).astype(np.float32)
+    return cast(np.ndarray, np.clip(rms / peak, 0.0, 1.0).astype(np.float32))
 
 
 class TextToSpeech:
@@ -73,7 +73,7 @@ class TextToSpeech:
 
         def _synth() -> tuple[np.ndarray, int]:
             samples, sample_rate = kokoro.create(text, voice=self.voice, speed=1.0, lang="en-us")
-            return samples, int(sample_rate)
+            return cast(np.ndarray, samples), int(sample_rate)
 
         try:
             return await asyncio.get_running_loop().run_in_executor(None, _synth)
