@@ -1,6 +1,6 @@
 from typing import Any
+from unittest.mock import MagicMock, patch
 import pytest
-from unittest.mock import patch
 from rei.core.executor import Executor, ExecutorError
 from rei.host.verify import GrantVerifier
 from rei.policy.engine import PolicyEngine
@@ -30,12 +30,13 @@ def executor(registry: CapabilityRegistry) -> Executor:
     return Executor(registry, verifier)
 
 
-@patch("rei.capabilities.builtin.media.AudioUtilities", create=True)
-@patch("rei.capabilities.builtin.media.cast", create=True)
-def test_executor_valid_grant(mock_cast: Any, mock_audio: Any, engine: PolicyEngine, executor: Executor) -> None:
+@patch("ctypes.cast")
+@patch("pycaw.pycaw.AudioUtilities.GetSpeakers")
+def test_executor_valid_grant(mock_speakers: Any, mock_cast: Any, engine: PolicyEngine, executor: Executor) -> None:
     # Mock pycaw so we don't change real system volume
-    mock_volume = mock_cast.return_value
-    mock_volume.SetMasterVolumeLevelScalar = lambda *a: None
+    mock_volume = MagicMock()
+    mock_cast.return_value = mock_volume
+    mock_speakers.return_value = MagicMock()
 
     intent = IntentProposal(
         type="intent", capability="media.set_volume", capability_version=1,
